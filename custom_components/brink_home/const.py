@@ -18,11 +18,11 @@ NAMES = {
 }
 
 MODES = {
-    "Automatikbetrieb": "Automatic",
-    "Handbetrieb": "Manual",
-    "Urlaubbetrieb": "Holiday",
-    "Partybetrieb": "Party",
-    "Nachtlüftungsbetrieb": "Night",
+    "0": "Automatic",
+    "1": "Manual",
+    "2": "Holiday",
+    "3": "Party",
+    "4": "Night",
 }
 
 MODE_TO_VALUE = {

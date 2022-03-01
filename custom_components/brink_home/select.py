@@ -37,7 +37,9 @@ class BrinkHomeVentilationSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
 
     async def async_select_option(self, option: str):
         mode = self.coordinator.data[self.device_index]["mode"]
-        await self.client.set_ventilation_value(self.system_id, self.gateway_id, mode, self.data, option)
+        result = await self.client.set_ventilation_value(self.system_id, self.gateway_id, mode, self.data, option)
+        mode["value"] = result["mode_value"]
+        self.coordinator.data[self.device_index]["mode"] = mode
 
     @property
     def current_option(self) -> str:
@@ -74,7 +76,10 @@ class BrinkHomeVentilationSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
 class BrinkHomeModeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
 
     async def async_select_option(self, option: str):
-        await self.client.set_mode_value(self.system_id, self.gateway_id, self.data, option)
+        ventilation = self.coordinator.data[self.device_index]["ventilation"]
+        result = await self.client.set_mode_value(self.system_id, self.gateway_id, self.data, ventilation, option)
+        ventilation["value"] = result["ventilation_value"]
+        self.coordinator.data[self.device_index]["ventilation"] = ventilation
 
     @property
     def current_option(self) -> str | None:
