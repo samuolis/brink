@@ -2,7 +2,7 @@
 
 # Brink-Home Ventilation
 
-Custom component for Home Assistant. This component is designed to integrate the [Brink-Home](https://www.brink-home.com/) systems.
+Custom component for Home Assistant. This component is designed to integrate the [Brink-Home](https://www.brink-home.com/) systems with [ebus Brink Emodule](https://www.brinkclimatesystems.nl/documenten/brink-home-emodule-imodule-614491.pdf).
 
 ## Installation
 
