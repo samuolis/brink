@@ -1,5 +1,5 @@
 {
-  "domain": "brink_home_ventilation",
+  "domain": "brink_home",
   "name": "Brink-home Venitlation",
   "config_flow": true,
   "documentation": "https://github.com/samuolis/brink/blob/master/README.md",

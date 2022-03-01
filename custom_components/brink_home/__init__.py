@@ -1,13 +1,12 @@
-"""Support for the Eldes API."""
+"""Support for the Brink-home API."""
 from datetime import timedelta
 import logging
 import asyncio
-from http import HTTPStatus
 
 import aiohttp
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, CONF_SCAN_INTERVAL
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, CONF_SCAN_INTERVAL, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady, ConfigEntryAuthFailed
 from homeassistant.helpers import config_validation as cv
@@ -19,8 +18,6 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import (
-    DEFAULT_NAME,
-    DEFAULT_ZONE,
     DATA_CLIENT,
     DATA_COORDINATOR,
     DATA_DEVICES,
@@ -31,13 +28,13 @@ from .core.brink_home_cloud import BrinkHomeCloud
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["select"]
+PLATFORMS = [Platform.SELECT]
 
-CONFIG_SCHEMA = cv.deprecated(DOMAIN)
+CONFIG_SCHEMA = cv.removed(DOMAIN, raise_if_present=False)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Eldes from a config entry."""
+    """Set up Brink home from a config entry."""
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
@@ -48,7 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         await brink_client.login()
     except (asyncio.TimeoutError, aiohttp.ClientError) as ex:
-        if ex.status == HTTPStatus.UNAUTHORIZED:
+        if ex.status == 401:
             raise ConfigEntryAuthFailed from ex
 
         raise ConfigEntryNotReady from ex
@@ -66,7 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             await brink_client.login()
             return await async_get_devices(hass, entry, brink_client)
         except Exception as ex:
-            _LOGGER.exception("Unknown error occurred during Eldes update request: %s", ex)
+            _LOGGER.exception("Unknown error occurred during Brink home update request: %s", ex)
             raise UpdateFailed(ex) from ex
 
     coordinator = DataUpdateCoordinator(

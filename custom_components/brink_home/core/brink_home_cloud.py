@@ -1,10 +1,10 @@
-"""Implementation for Eldes Cloud"""
+"""Implementation for Brink-Home Cloud"""
 import asyncio
 import async_timeout
 import logging
 import aiohttp
 
-from ..const import API_URL, API_PATHS
+from ..const import API_URL, NAMES, MODES, MODE_TO_VALUE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,7 +20,6 @@ class BrinkHomeCloud:
             "User-Agent": "okhttp/3.11.0",
             "Content-Type": "application/json; charset=UTF-8",
         }
-        self.token_exists = None
 
         self._http_session = session
         self._username = username
@@ -90,12 +89,13 @@ class BrinkHomeCloud:
 
     async def get_description_values(self, system_id, gateway_id):
         """Gets values info."""
-        url = f"{API_URL}GetParameterValues?GatewayId={gateway_id}&SystemId={system_id}"
+        url = f"{API_URL}GetAppGuiDescriptionForGateway?GatewayId={gateway_id}&SystemId={system_id}"
 
         response = await self._api_call(url, "GET")
         result = await response.json()
         menu_items = result.get("menuItems", [])
-        pages = menu_items.get("pages", [])
+        menu_item = menu_items[0]
+        pages = menu_item.get("pages", [])
         home_page = pages[0]
         parameters = home_page.get("parameterDescriptors", [])
         ventilation = parameters[0]
@@ -115,7 +115,7 @@ class BrinkHomeCloud:
 
     def __get_type(self, type):
         return {
-            "name": type["name"],
+            "name": NAMES.get(type["name"], type["name"]),
             "value_id": type["valueId"],
             "value": type["value"],
             "values": self.__get_values(type)
@@ -129,13 +129,13 @@ class BrinkHomeCloud:
             if value["isSelectable"]:
                 extracted.append({
                     "value": value["value"],
-                    "text": value["displayText"]
+                    "text": MODES.get(value["displayText"], value["displayText"])
                 })
 
         return extracted
 
     # 1 as mode value changes mode to manual every time you change ventilation value
-    async def set_ventilation_value(self, system_id, gateway_id, mode, ventilation):
+    async def set_ventilation_value(self, system_id, gateway_id, mode, ventilation, value):
         """Sets alarm to provided mode."""
         data = {
             'GatewayId': gateway_id,
@@ -147,7 +147,7 @@ class BrinkHomeCloud:
                 },
                 {
                     'ValueId': ventilation["value_id"],
-                    'Value': ventilation["value"],
+                    'Value': value,
                 }
             ],
             'SendInOneBundle': True,
@@ -169,7 +169,10 @@ class BrinkHomeCloud:
 
         return result
 
-    async def set_mode_value(self, system_id, gateway_id, mode):
+    async def set_mode_value(self, system_id, gateway_id, mode, value):
+        mode_value = MODE_TO_VALUE.get(value, None)
+        if mode_value is None:
+            return
         """Sets alarm to provided mode."""
         data = {
             'GatewayId': gateway_id,
@@ -177,7 +180,7 @@ class BrinkHomeCloud:
             'WriteParameterValues': [
                 {
                     'ValueId': mode["value_id"],
-                    'Value': mode["value"],
+                    'Value': mode_value,
                 },
             ],
             'SendInOneBundle': True,
