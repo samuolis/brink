@@ -1,6 +1,8 @@
 """Constant values for the Brink Home component."""
 
 DOMAIN = "brink_home"
+DEFAULT_NAME = "Brink"
+DEFAULT_MODEL = "Zone"
 
 DATA_CLIENT = "brink_client"
 DATA_COORDINATOR = "coordinator"

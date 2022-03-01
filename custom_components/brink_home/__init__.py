@@ -22,7 +22,7 @@ from .const import (
     DATA_COORDINATOR,
     DATA_DEVICES,
     DEFAULT_SCAN_INTERVAL,
-    DOMAIN
+    DOMAIN, DEFAULT_NAME, DEFAULT_MODEL
 )
 from .core.brink_home_cloud import BrinkHomeCloud
 
@@ -136,7 +136,10 @@ class BrinkHomeDeviceEntity(CoordinatorEntity):
 
     @property
     def device_info(self):
-        """Return device info for the Brink home entity."""
+        """Return device info for the Eldes entity."""
         return {
+            "identifiers": {(DOMAIN, self.system_id, self.gateway_id)},
             "name": self.data["name"],
+            "manufacturer": DEFAULT_NAME,
+            "model": DEFAULT_MODEL
         }
