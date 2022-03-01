@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from homeassistant.components.select import SelectEntity
@@ -75,9 +77,11 @@ class BrinkHomeModeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
         await self.client.set_mode_value(self.system_id, self.gateway_id, self.data, option)
 
     @property
-    def current_option(self) -> str:
-        current_value = self.data["text"]
-        return current_value
+    def current_option(self) -> str | None:
+        for value in self.data["values"]:
+            if value["value"] == self.data["value"]:
+                return value["text"]
+        return None
 
     @property
     def options(self) -> list[str]:
