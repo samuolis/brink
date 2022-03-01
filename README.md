@@ -1,8 +1,8 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 
-# Brink-Home
+# Brink-Home Ventilation
 
-Custom component for Home Assistant. This component is designed to integrate the Brink-Home systems.
+Custom component for Home Assistant. This component is designed to integrate the [Brink-Home](https://www.brink-home.com/) systems.
 
 ## Installation
 
