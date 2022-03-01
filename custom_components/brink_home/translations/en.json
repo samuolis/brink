@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Brink Home Ventilation",
+        "description": "Please login to your Brink Home portal services account.",
+        "data": {
+          "username": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Can't connect. Try again later.",
+      "invalid_auth": "Email or password is incorrect.",
+      "unknown": "Unknown error."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure Brink Home integration",
+        "description": "Update the scan interval to poll for data more often.",
+        "data": {
+          "scan_interval": "Scan Interval (seconds)"
+        }
+      }
+    }
+  }
+}
