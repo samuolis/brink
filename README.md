@@ -16,3 +16,7 @@ You have two options for installation:
 
 - Copy "brink_home" folder to the "/config/custom_components" folder.
 - Restart HA server.
+
+### WORKING ON:
+- Brink Renovent 180
+- Please tell me, it should work with all ventilation systems
