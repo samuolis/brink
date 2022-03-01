@@ -19,4 +19,4 @@ You have two options for installation:
 
 ### WORKING ON:
 - Brink Renovent 180
-- Please tell me, it should work with all ventilation systems
+- Please tell me, it should work with all Brink ventilation systems
