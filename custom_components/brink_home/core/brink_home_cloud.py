@@ -210,9 +210,9 @@ class BrinkHomeCloud:
         new_ventilation_value = None
         new_mode_value = None
         for value in result:
-            if value["valueId"] == ventilation["valueId"]:
+            if value["valueId"] == ventilation["value_id"]:
                 new_ventilation_value = value["value"]
-            if value["valueId"] == mode["valueId"]:
+            if value["valueId"] == mode["value_id"]:
                 new_mode_value = value["value"]
 
         return {
