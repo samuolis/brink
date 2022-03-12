@@ -14,7 +14,7 @@ class BrinkHomeCloud:
 
     def __init__(self, session: aiohttp.ClientSession, username: str, password: str):
         """Performs login and save session cookie."""
-        self.timeout = 10
+        self.timeout = 20
         self.headers = {
             "X-Requested-With": "XMLHttpRequest",
             "User-Agent": "okhttp/3.11.0",
@@ -26,6 +26,12 @@ class BrinkHomeCloud:
         self._password = password
 
     async def _api_call(self, url, method, data=None):
+        _LOGGER.debug(
+            "%s request: %s, data %s",
+            method,
+            url,
+            data
+        )
         try:
             async with async_timeout.timeout(self.timeout):
                 req = await self._http_session.request(
@@ -34,6 +40,12 @@ class BrinkHomeCloud:
                     json=data,
                     headers=self.headers
                 )
+
+            if req.status == 401:
+                _LOGGER.error("Client unauthorized on API %s request", url)
+                await self.login()
+                req = await self._api_call(url, method, data)
+
             req.raise_for_status()
             return req
 
