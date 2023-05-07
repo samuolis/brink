@@ -15,6 +15,8 @@ API_URL = "https://www.brink-home.com/portal/api/portal/"
 NAMES = {
     "Lüftungsstufe": "Ventilation power",
     "Betriebsart": "Ventilation mode",
+    "Restlaufzeit Betriebsartfunktion": "Remaining run time operating mode function",
+    "Status Filtermeldung": "Filter message status"
 }
 
 MODES = {
