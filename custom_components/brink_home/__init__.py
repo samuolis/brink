@@ -28,7 +28,7 @@ from .core.brink_home_cloud import BrinkHomeCloud
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.SELECT]
+PLATFORMS = [Platform.SELECT, Platform.SENSOR, Platform.BINARY_SENSOR]
 
 CONFIG_SCHEMA = cv.removed(DOMAIN, raise_if_present=False)
 
@@ -102,6 +102,8 @@ async def async_get_devices(hass: HomeAssistant, entry: ConfigEntry, brink_clien
         description = await brink_client.get_description_values(system["system_id"], system["gateway_id"])
         system["ventilation"] = description["ventilation"]
         system["mode"] = description["mode"]
+        system["mode_remaining_time"] = description["mode_remaining_time"]
+        system["filters_need_change"] = description["filters_need_change"]
 
     hass.data[DOMAIN][entry.entry_id][DATA_DEVICES] = systems
 
