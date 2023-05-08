@@ -4,7 +4,8 @@ import async_timeout
 import logging
 import aiohttp
 
-from ..const import API_URL, NAMES, MODES, MODE_TO_VALUE
+from ..const import API_URL
+from ..translations import TRANSLATIONS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -131,7 +132,7 @@ class BrinkHomeCloud:
 
     def __get_type(self, type):
         return {
-            "name": NAMES.get(type["name"], type["name"]),
+            "name": TRANSLATIONS.get(type["name"], type["name"]),
             "value_id": type["valueId"],
             "value": type["value"],
             "values": self.__get_values(type)
@@ -145,7 +146,7 @@ class BrinkHomeCloud:
             if value["isSelectable"]:
                 extracted.append({
                     "value": value["value"],
-                    "text": MODES.get(value["value"], value["value"])
+                    "text": TRANSLATIONS.get(value["displayText"], value["displayText"])
                 })
 
         return extracted
@@ -188,7 +189,7 @@ class BrinkHomeCloud:
         return mapped_result
 
     async def set_mode_value(self, system_id, gateway_id, mode, ventilation, value):
-        mode_value = MODE_TO_VALUE.get(value, None)
+        mode_value = ventilation["values"][value]["value"]
         if mode_value is None:
             return
         """Sets alarm to provided mode."""
