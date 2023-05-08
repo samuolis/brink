@@ -153,7 +153,9 @@ class BrinkHomeCloud:
 
     # 1 as mode value changes mode to manual every time you change ventilation value
     async def set_ventilation_value(self, system_id, gateway_id, mode, ventilation, value):
-        """Sets alarm to provided mode."""
+        ventilation_value = ventilation["values"][value]["value"]
+        if ventilation_value is None:
+            return
         data = {
             'GatewayId': gateway_id,
             'SystemId': system_id,
@@ -189,10 +191,9 @@ class BrinkHomeCloud:
         return mapped_result
 
     async def set_mode_value(self, system_id, gateway_id, mode, ventilation, value):
-        mode_value = ventilation["values"][value]["value"]
+        mode_value = mode["values"][value]["value"]
         if mode_value is None:
             return
-        """Sets alarm to provided mode."""
         data = {
             'GatewayId': gateway_id,
             'SystemId': system_id,
