@@ -1,4 +1,8 @@
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
+[![HACS Badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
+
+[![GitHub Release](https://img.shields.io/github/release/samuolis/brink.svg?style=for-the-badge&color=blue)](https://github.com/samuolis/brink/releases) 
+
+![Project Maintenance](https://img.shields.io/badge/maintainer-Lukas%20Samuolis-blue.svg?style=for-the-badge)
 
 # Brink-Home Ventilation
 
@@ -10,7 +14,14 @@ You have two options for installation:
 
 ### HACS
 
-- In the [HACS](https://hacs.xyz) panel, go to integrations and click the big orange '+' button. Search for 'Brink-Home ventilations' and click \'Download this repository with HACS'.
+- Go to the [HACS](https://hacs.xyz) panel
+- Go to integrations 
+- Click 3 dots at the top
+- Click Custom repositories
+- Add `https://github.com/samuolis/brink` as repository.
+- Click '+ EXPLORE AND DOWNLOAD REPOSITORIES' button. 
+- Search for 'Brink-Home ventilations'
+- Click \'Download this repository with HACS'.
 
 ### Manually
 
