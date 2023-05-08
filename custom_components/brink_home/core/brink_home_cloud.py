@@ -166,7 +166,7 @@ class BrinkHomeCloud:
                 },
                 {
                     'ValueId': ventilation["value_id"],
-                    'Value': value,
+                    'Value': ventilation_value,
                 }
             ],
             'SendInOneBundle': True,
@@ -191,7 +191,7 @@ class BrinkHomeCloud:
         return mapped_result
 
     async def set_mode_value(self, system_id, gateway_id, mode, ventilation, value):
-        mode_value = mode["values"][value]["value"]
+        mode_value = self.__find(mode["values"], "text", value)["value"]
         if mode_value is None:
             return
         data = {
@@ -223,6 +223,11 @@ class BrinkHomeCloud:
         )
 
         return mapped_result
+
+    def __find(self, arr , attr, value):
+        for x in arr:
+            if x[attr] == value:
+                return x
 
     def __map_write_result(self, result, ventilation, mode):
         new_ventilation_value = None

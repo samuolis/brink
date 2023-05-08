@@ -28,7 +28,7 @@ from .core.brink_home_cloud import BrinkHomeCloud
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.SELECT, Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.SELECT, Platform.SENSOR, Platform.BINARY_SENSOR, Platform.FAN]
 
 CONFIG_SCHEMA = cv.removed(DOMAIN, raise_if_present=False)
 

@@ -5,10 +5,11 @@ import logging
 from homeassistant.components.fan import (
     DOMAIN,
     FanEntity,
-    SUPPORT_PRESET_MODE
+    SUPPORT_SET_SPEED
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.util.percentage import int_states_in_range, ranged_value_to_percentage, percentage_to_ranged_value
 
 from custom_components.brink_home import BrinkHomeDeviceEntity
 
@@ -20,6 +21,8 @@ from .const import (
 
 
 _LOGGER = logging.getLogger(__name__)
+
+SPEED_RANGE = (1, 3)  # off is not included
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
@@ -38,25 +41,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 class BrinkHomeVentilationFanEntity(BrinkHomeDeviceEntity, FanEntity):
 
-    async def async_set_preset_mode(self, preset_mode: str) -> None:
+    async def async_set_percentage(self, percentage: int) -> None:
         mode = self.coordinator.data[self.device_index]["mode"]
-        await self.client.set_ventilation_value(self.system_id, self.gateway_id, mode, self.data, preset_mode)
+        await self.client.set_ventilation_value(self.system_id, self.gateway_id, mode, self.data, int(percentage_to_ranged_value(SPEED_RANGE, percentage)))
 
     @property
-    def preset_mode(self) -> str:
-        for value in self.data["values"]:
-            if value["value"] == self.data["value"]:
-                return value["text"]
-        return None
+    def percentage(self):
+        """Return the current speed percentage."""
+        return ranged_value_to_percentage(SPEED_RANGE, int(self.data["value"]))
 
     @property
-    def preset_modes(self) -> list[str]:
-        """Return a set of selectable options."""
-        values = []
-        for value in self.data["values"]:
-            values.append(value["text"])
-
-        return values
+    def speed_count(self) -> int:
+        """Return the number of speeds the fan supports."""
+        return int_states_in_range(SPEED_RANGE)
 
     @property
     def name(self):
@@ -73,4 +70,27 @@ class BrinkHomeVentilationFanEntity(BrinkHomeDeviceEntity, FanEntity):
     @property
     def supported_features(self):
         """Return supported features."""
-        return SUPPORT_PRESET_MODE
+        return SUPPORT_SET_SPEED
+    
+    @property
+    def is_on(self):
+        """If the fan currently is on or off."""
+        if self.data["value"] is not None:
+            return int(self.data["value"]) != 0
+        return None
+    
+    async def async_turn_on(
+        self,
+        speed: str = None,
+        percentage: int = None,
+        preset_mode: str = None,
+        **kwargs,
+    ) -> None:
+        """Turn on the fan."""
+        if percentage is None:
+            percentage = 33
+        self.async_set_percentage(percentage)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Turn off the fan."""
+        self.async_set_percentage(0)
