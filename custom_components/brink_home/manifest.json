@@ -7,8 +7,8 @@
   "documentation": "https://github.com/samuolis/brink/blob/master/README.md",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/samuolis/brink/issues",
-  "ssdp": [],
   "requirements": [],
+  "ssdp": [],
   "version": "1.0.1",
   "zeroconf": []
 }
