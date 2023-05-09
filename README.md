@@ -8,6 +8,8 @@
 
 Custom component for Home Assistant. This component is designed to integrate the [Brink-Home](https://www.brink-home.com/) systems with [ebus Brink Emodule](https://www.brinkclimatesystems.nl/documenten/brink-home-emodule-imodule-614491.pdf).
 
+<img width="503" alt="Screenshot 2023-05-08 at 21 14 39" src="https://user-images.githubusercontent.com/28056781/236899814-e903fbb0-e007-4938-aa2c-0e04e91fbb36.png">
+
 ## Installation
 
 You have two options for installation:
