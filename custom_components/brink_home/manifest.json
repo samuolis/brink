@@ -1,5 +1,5 @@
 {
-  "domain": "brink_home",
+  "domain": "brink_ventilation",
   "name": "Brink-home Venitlation",
   "codeowners": ["@samuolis"],
   "config_flow": true,
