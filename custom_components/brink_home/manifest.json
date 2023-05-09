@@ -1,14 +1,14 @@
 {
   "domain": "brink_home",
   "name": "Brink-home Venitlation",
-  "config_flow": true,
-  "documentation": "https://github.com/samuolis/brink/blob/master/README.md",
-  "issue_tracker": "https://github.com/samuolis/brink/issues",
   "codeowners": ["@samuolis"],
+  "config_flow": true,
   "dependencies": ["http"],
+  "documentation": "https://github.com/samuolis/brink/blob/master/README.md",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/samuolis/brink/issues",
+  "ssdp": [],
   "requirements": [],
   "version": "1.0.1",
-  "iot_class": "cloud_polling",
-  "ssdp": [],
   "zeroconf": []
 }
