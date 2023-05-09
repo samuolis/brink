@@ -170,25 +170,12 @@ class BrinkHomeCloud:
                 }
             ],
             'SendInOneBundle': True,
-            'DependendReadValuesAfterWrite': [
-                ventilation["value_id"],
-                mode["value_id"]
-            ]
+            'DependendReadValuesAfterWrite': []
         }
 
         url = f"{API_URL}WriteParameterValuesAsync"
 
-        response = await self._api_call(url, "POST", data)
-        result = await response.json()
-
-        mapped_result = self.__map_write_result(result, ventilation, mode)
-
-        _LOGGER.debug(
-            "set_ventilation_value result: %s",
-            mapped_result
-        )
-
-        return mapped_result
+        await self._api_call(url, "POST", data)
 
     async def set_mode_value(self, system_id, gateway_id, mode, ventilation, value):
         mode_value = self.__find(mode["values"], "text", value)["value"]
@@ -204,41 +191,14 @@ class BrinkHomeCloud:
                 },
             ],
             'SendInOneBundle': True,
-            'DependendReadValuesAfterWrite': [
-                mode["value_id"],
-                ventilation["value_id"]
-            ]
+            'DependendReadValuesAfterWrite': []
         }
 
         url = f"{API_URL}WriteParameterValuesAsync"
 
-        response = await self._api_call(url, "POST", data)
-        result = await response.json()
-
-        mapped_result = self.__map_write_result(result, ventilation, mode)
-
-        _LOGGER.debug(
-            "set_mode_value result: %s",
-            mapped_result
-        )
-
-        return mapped_result
+        await self._api_call(url, "POST", data)
 
     def __find(self, arr , attr, value):
         for x in arr:
             if x[attr] == value:
                 return x
-
-    def __map_write_result(self, result, ventilation, mode):
-        new_ventilation_value = None
-        new_mode_value = None
-        for value in result:
-            if value["valueId"] == ventilation["value_id"]:
-                new_ventilation_value = value["value"]
-            if value["valueId"] == mode["value_id"]:
-                new_mode_value = value["value"]
-
-        return {
-            "mode_value": new_mode_value,
-            "ventilation_value": new_ventilation_value
-        }

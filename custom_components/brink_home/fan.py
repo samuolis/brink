@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 
 from homeassistant.components.fan import (
     DOMAIN,
@@ -42,8 +43,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class BrinkHomeVentilationFanEntity(BrinkHomeDeviceEntity, FanEntity):
 
     async def async_set_percentage(self, percentage: int) -> None:
+        await self.__async_updateData(math.ceil(percentage_to_ranged_value(SPEED_RANGE, percentage)))
+    
+    async def __async_updateData(self, value: int) -> None:
         mode = self.coordinator.data[self.device_index]["mode"]
-        await self.client.set_ventilation_value(self.system_id, self.gateway_id, mode, self.data, int(percentage_to_ranged_value(SPEED_RANGE, percentage)))
+        await self.client.set_ventilation_value(self.system_id, self.gateway_id, mode, self.data, value)
+        self.coordinator.data[self.device_index][self.entity_name]["value"] = value
+        self.coordinator.data[self.device_index]["mode"]["value"] = "1"
 
     @property
     def percentage(self):
@@ -93,4 +99,4 @@ class BrinkHomeVentilationFanEntity(BrinkHomeDeviceEntity, FanEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn off the fan."""
-        self.async_set_percentage(0)
+        await self.__async_updateData(0)
