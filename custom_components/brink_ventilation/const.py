@@ -1,6 +1,6 @@
 """Constant values for the Brink Home component."""
 
-DOMAIN = "brink_home"
+DOMAIN = "brink_ventilation"
 DEFAULT_NAME = "Brink"
 DEFAULT_MODEL = "Zone"
 
