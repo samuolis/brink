@@ -33,4 +33,5 @@ You have two options for installation:
 ### WORKING ON:
 - Brink Renovent 180
 - Brink Renovent 300
+- Brink Renovent 400 Plus
 - Please tell me, it should work with all Brink ventilation systems
