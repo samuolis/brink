@@ -55,7 +55,7 @@ class BrinkFilterNeedChangeBinarySensor(BrinkHomeDeviceEntity, BinarySensorEntit
     @property
     def is_on(self):
         """Return true if sensor is on."""
-        return self.data["value"] == 1
+        return self.data["value"] == "1"
     
     @property
     def device_class(self):

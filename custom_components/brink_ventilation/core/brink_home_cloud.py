@@ -113,13 +113,11 @@ class BrinkHomeCloud:
         parameters = home_page.get("parameterDescriptors", [])
         ventilation = parameters[0]
         mode = parameters[1]
-        mode_remaining_time = parameters[2]
         filters_need_change = parameters[3]
 
         description_result = {
             "ventilation": self.__get_type(ventilation),
             "mode": self.__get_type(mode),
-            "mode_remaining_time": self.__get_type(mode_remaining_time),
             "filters_need_change": self.__get_type(filters_need_change)
         }
 
