@@ -1,4 +1,4 @@
-[![HACS Badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
 
 [![GitHub Release](https://img.shields.io/github/release/samuolis/brink.svg?style=for-the-badge&color=blue)](https://github.com/samuolis/brink/releases) 
 
@@ -33,4 +33,5 @@ You have two options for installation:
 ### WORKING ON:
 - Brink Renovent 180
 - Brink Renovent 300
+- Brink Renovent 400 Plus
 - Please tell me, it should work with all Brink ventilation systems
