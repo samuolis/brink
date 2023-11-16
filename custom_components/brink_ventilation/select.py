@@ -35,8 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class BrinkHomeModeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
 
     async def async_select_option(self, option: str):
-        ventilation = self.coordinator.data[self.device_index]["ventilation"]
-        await self.client.set_mode_value(self.system_id, self.gateway_id, self.data, ventilation, option)
+        await self.client.set_mode_value(self.system_id, self.gateway_id, self.data, option)
 
     @property
     def current_option(self) -> str | None:

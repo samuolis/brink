@@ -1,4 +1,3 @@
-"""Implementation for Brink-Home Cloud"""
 import asyncio
 import async_timeout
 import logging
@@ -121,6 +120,7 @@ class BrinkHomeCloud:
         mode = self.__find(parameters, "uiId", "Betriebsart")
         filters_need_change = self.__find(parameters, "uiId", "Status Filtermeldung")
 
+
         description_result = {
             "ventilation": self.__get_type(ventilation),
             "mode": self.__get_type(mode),
@@ -181,7 +181,7 @@ class BrinkHomeCloud:
 
         await self._api_call(url, "POST", data)
 
-    async def set_mode_value(self, system_id, gateway_id, mode, ventilation, value):
+    async def set_mode_value(self, system_id, gateway_id, mode, value):
         mode_value = self.__find(mode["values"], "text", value)["value"]
         if mode_value is None:
             return
@@ -203,7 +203,13 @@ class BrinkHomeCloud:
         await self._api_call(url, "POST", data)
 
     def __find(self, arr , attr, value):
-        for x in arr:
-            if hasattr(x, attr):
-                if x[attr] == value:
-                    return x
+        for obj in arr:
+            try:
+                if obj[attr] == value:
+                    return obj
+            except:
+                _LOGGER.debug(
+                    "find error: %s",
+                    value
+                )
+
