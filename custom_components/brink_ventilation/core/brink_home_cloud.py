@@ -204,5 +204,6 @@ class BrinkHomeCloud:
 
     def __find(self, arr , attr, value):
         for x in arr:
-            if x[attr] == value:
-                return x
+            if hasattr(x, attr):
+                if x[attr] == value:
+                    return x
