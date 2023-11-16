@@ -111,9 +111,9 @@ class BrinkHomeCloud:
         pages = menu_item.get("pages", [])
         home_page = pages[0]
         parameters = home_page.get("parameterDescriptors", [])
-        ventilation = parameters[0]
-        mode = parameters[1]
-        filters_need_change = parameters[3]
+        ventilation = self.__find(parameters, "uiId", "Lüftungsstufe")
+        mode = self.__find(parameters, "uiId", "Betriebsart")
+        filters_need_change = self.__find(parameters, "uiId", "Status Filtermeldung")
 
         description_result = {
             "ventilation": self.__get_type(ventilation),
