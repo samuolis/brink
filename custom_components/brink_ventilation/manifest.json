@@ -1,6 +1,6 @@
 {
   "domain": "brink_ventilation",
-  "name": "Brink-home Venitlation",
+  "name": "Brink-home Ventilation",
   "codeowners": ["@samuolis"],
   "config_flow": true,
   "dependencies": ["http"],

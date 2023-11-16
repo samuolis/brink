@@ -106,6 +106,12 @@ class BrinkHomeCloud:
 
         response = await self._api_call(url, "GET")
         result = await response.json()
+
+        _LOGGER.debug(
+            "Response result: %s",
+            result
+        )
+        
         menu_items = result.get("menuItems", [])
         menu_item = menu_items[0]
         pages = menu_item.get("pages", [])
