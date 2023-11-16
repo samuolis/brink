@@ -18,10 +18,6 @@ You have two options for installation:
 
 - Go to the [HACS](https://hacs.xyz) panel
 - Go to integrations 
-- Click 3 dots at the top
-- Click Custom repositories
-- Add `https://github.com/samuolis/brink` as repository.
-- Click '+ EXPLORE AND DOWNLOAD REPOSITORIES' button. 
 - Search for 'Brink-Home ventilations'
 - Click \'Download this repository with HACS'.
 
