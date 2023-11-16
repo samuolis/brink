@@ -1,3 +1,4 @@
+"""Implementation for Brink-Home Cloud"""
 import asyncio
 import async_timeout
 import logging
