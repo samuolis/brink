@@ -6,7 +6,7 @@ import math
 from homeassistant.components.fan import (
     DOMAIN,
     FanEntity,
-    SUPPORT_SET_SPEED
+    FanEntityFeature
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -75,9 +75,9 @@ class BrinkHomeVentilationFanEntity(BrinkHomeDeviceEntity, FanEntity):
     
     @property
     def supported_features(self):
-        """Return supported features."""
-        return SUPPORT_SET_SPEED
-    
+        """Flag supported features."""
+        return FanEntityFeature.TURN_OFF | FanEntityFeature.TURN_ON | FanEntityFeature.SET_SPEED
+
     @property
     def is_on(self):
         """If the fan currently is on or off."""
