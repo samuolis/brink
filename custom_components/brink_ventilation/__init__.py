@@ -28,7 +28,7 @@ from .core.brink_home_cloud import BrinkHomeCloud
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.SELECT, Platform.BINARY_SENSOR, Platform.FAN]
+PLATFORMS = [Platform.SELECT, Platform.BINARY_SENSOR, Platform.FAN, Platform.SENSOR]
 
 CONFIG_SCHEMA = cv.removed(DOMAIN, raise_if_present=False)
 
@@ -100,9 +100,16 @@ async def async_get_devices(hass: HomeAssistant, entry: ConfigEntry, brink_clien
     # Retrieve additional description
     for system in systems:
         description = await brink_client.get_description_values(system["system_id"], system["gateway_id"])
+        
+        # Add core ventilation control values
         system["ventilation"] = description["ventilation"]
         system["mode"] = description["mode"]
         system["filters_need_change"] = description["filters_need_change"]
+        
+        # Add any additional sensors (CO2, temperature, humidity, etc.)
+        for key, value in description.items():
+            if key not in ["ventilation", "mode", "filters_need_change"]:
+                system[key] = value
 
     hass.data[DOMAIN][entry.entry_id][DATA_DEVICES] = systems
 
