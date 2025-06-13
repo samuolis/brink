@@ -27,6 +27,7 @@ You have two options for installation:
 - Restart HA server.
 
 ### WORKING ON:
+- Brink Flair 200
 - Brink Renovent 180
 - Brink Renovent 300
 - Brink Renovent 400 Plus

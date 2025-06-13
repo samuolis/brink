@@ -113,20 +113,54 @@ class BrinkHomeCloud:
         )
         
         menu_items = result.get("menuItems", [])
+        if not menu_items:
+            _LOGGER.debug("No menu items found in API response")
+            return {}
+            
         menu_item = menu_items[0]
         pages = menu_item.get("pages", [])
-        home_page = pages[0]
-        parameters = home_page.get("parameterDescriptors", [])
-        ventilation = self.__find(parameters, "uiId", "Lüftungsstufe")
-        mode = self.__find(parameters, "uiId", "Betriebsart")
-        filters_need_change = self.__find(parameters, "uiId", "Status Filtermeldung")
+        if not pages:
+            _LOGGER.debug("No pages found in menu item")
+            return {}
+            
+        # Extract all parameters from all pages
+        all_parameters = []
+        for page in pages:
+            parameters = page.get("parameterDescriptors", [])
+            all_parameters.extend(parameters)
+            
+        _LOGGER.debug(f"Found {len(all_parameters)} parameters across all pages")
 
-
+        # Find the basic parameters
+        ventilation = self.__find(all_parameters, "uiId", "Lüftungsstufe")
+        mode = self.__find(all_parameters, "uiId", "Betriebsart")
+        filters_need_change = self.__find(all_parameters, "uiId", "Status Filtermeldung")
+        
+        # Initialize the result dictionary with the basic parameters
         description_result = {
             "ventilation": self.__get_type(ventilation),
             "mode": self.__get_type(mode),
             "filters_need_change": self.__get_type(filters_need_change)
         }
+        
+        # Look for CO2 sensors and other sensors and add them to the result
+        for param in all_parameters:
+            param_name = param.get("name", "")
+            
+            # Add CO2 sensors
+            if "PPM eBus CO2-sensor" in param_name or "PPM CO2-sensor" in param_name:
+                _LOGGER.debug(f"Found CO2 sensor: {param_name}")
+                description_result[param_name] = self.__get_type(param)
+                
+            # Add temperature sensors
+            elif "temperatur" in param_name.lower():
+                _LOGGER.debug(f"Found temperature sensor: {param_name}")
+                description_result[param_name] = self.__get_type(param)
+                
+            # Add humidity sensors
+            elif "feuchte" in param_name.lower():
+                _LOGGER.debug(f"Found humidity sensor: {param_name}")
+                description_result[param_name] = self.__get_type(param)
 
         _LOGGER.debug(
             "get_description_values result: %s",
