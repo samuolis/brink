@@ -15,7 +15,15 @@
         "default": "mdi:valve"
       },
       "ventilation_level": {
-        "default": "mdi:fan"
+        "default": "mdi:fan",
+        "state": {
+          "ha_automated": "mdi:home-automation"
+        }
+      }
+    },
+    "button": {
+      "extra_ventilation": {
+        "default": "mdi:fan-plus"
       }
     },
     "sensor": {
@@ -73,6 +81,16 @@
       },
       "co2_sensor_4": {
         "default": "mdi:molecule-co2"
+      },
+      "extra_ventilation_remaining": {
+        "default": "mdi:timer-sand"
+      },
+      "current_season": {
+        "default": "mdi:theme-light-dark",
+        "state": {
+          "summer": "mdi:weather-sunny",
+          "winter": "mdi:snowflake"
+        }
       }
     },
     "binary_sensor": {
