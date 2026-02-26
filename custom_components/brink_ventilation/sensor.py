@@ -42,7 +42,10 @@ from .const import (
     PARAM_REMAINING_DURATION,
     PARAM_SUPPLY_AIR_FLOW,
     PARAM_SUPPLY_TEMP,
+    PARAM_VENTILATION_LEVEL,
     PREHEATER_STATUS_MAP,
+    SEASON_SUMMER,
+    SEASON_WINTER,
 )
 from .coordinator import BrinkDataCoordinator
 from .entity import BrinkHomeDeviceEntity
@@ -204,7 +207,7 @@ async def async_setup_entry(
             return
 
         known_systems.update(new_systems)
-        entities: list[BrinkHomeSensorEntity] = []
+        entities: list[SensorEntity] = []
 
         for system_id in new_systems:
             device = coordinator.data[system_id]
@@ -223,6 +226,15 @@ async def async_setup_entry(
                             )
                         )
                         found_params.add(desc.param_id)
+
+        # Add automation-controller-based sensors (not tied to API parameters)
+        for system_id in new_systems:
+            entities.append(
+                BrinkExtraVentRemainingEntity(coordinator, system_id)
+            )
+            entities.append(
+                BrinkCurrentSeasonEntity(coordinator, system_id)
+            )
 
         if entities:
             _LOGGER.debug("Adding %s sensor entities", len(entities))
@@ -270,3 +282,77 @@ class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):
             return float(value)
         except (ValueError, TypeError):
             return value
+
+
+class BrinkExtraVentRemainingEntity(BrinkHomeDeviceEntity, SensorEntity):
+    """Sensor for extra ventilation time remaining (from automation controller)."""
+
+    _attr_translation_key = "extra_ventilation_remaining"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: BrinkDataCoordinator,
+        system_id: int,
+    ) -> None:
+        """Initialize the extra ventilation remaining sensor."""
+        super().__init__(
+            coordinator,
+            system_id,
+            PARAM_VENTILATION_LEVEL,
+            "extra_ventilation_remaining",
+        )
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID for this entity."""
+        return f"{DOMAIN}_{self._system_id}_extra_ventilation_remaining"
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self.coordinator.last_update_success and self._device is not None
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the extra ventilation time remaining in minutes."""
+        return self.coordinator.automation_controller.boost_remaining_minutes
+
+
+class BrinkCurrentSeasonEntity(BrinkHomeDeviceEntity, SensorEntity):
+    """Sensor for the current season (from automation controller)."""
+
+    _attr_translation_key = "current_season"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [SEASON_SUMMER, SEASON_WINTER]
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator: BrinkDataCoordinator,
+        system_id: int,
+    ) -> None:
+        """Initialize the current season sensor."""
+        super().__init__(
+            coordinator,
+            system_id,
+            PARAM_VENTILATION_LEVEL,
+            "current_season",
+        )
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID for this entity."""
+        return f"{DOMAIN}_{self._system_id}_current_season"
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self.coordinator.last_update_success and self._device is not None
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the current season."""
+        return self.coordinator.automation_controller.season
