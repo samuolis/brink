@@ -19,6 +19,14 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     coordinator = entry.runtime_data.coordinator
+    controller = coordinator.automation_controller
+    controller_diagnostics = {
+        "state": controller.state.value if hasattr(controller.state, 'value') else str(controller.state),
+        "season": controller.season,
+        "boost_remaining_minutes": controller.boost_remaining_minutes,
+        "has_pending_writes": controller.has_pending_writes,
+        "humidity_sensors_configured": len(controller.configured_humidity_sensors),
+    }
     # Replace integer system_id keys with opaque labels to prevent leakage
     devices_redacted = {
         f"device_{i}": async_redact_data(v, TO_REDACT)
@@ -28,4 +36,5 @@ async def async_get_config_entry_diagnostics(
         "entry_data": async_redact_data(dict(entry.data), TO_REDACT),
         "entry_options": dict(entry.options),
         "devices": devices_redacted,
+        "automation_controller": controller_diagnostics,
     }
