@@ -14,6 +14,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import BrinkConfigEntry
+from .automation_controller import AutomationState
 from .const import (
     BYPASS_OPERATION_MAP,
     BYPASS_OPERATION_REVERSE,
@@ -217,6 +218,21 @@ class BrinkHomeVentilationLevelSelectEntity(BrinkHomeSelectEntity):
     _reverse_map = VENTILATION_LEVEL_REVERSE
 
     @property
+    def current_option(self) -> str | None:
+        """Return the current option."""
+        controller = self.coordinator.automation_controller
+        if controller.state != AutomationState.IDLE:
+            return "ha_automated"
+        # Fall back to normal API-based value
+        param = self._param
+        if param is None:
+            return None
+        value = param.get("value")
+        if value is None:
+            return None
+        return self._value_map.get(str(value))
+
+    @property
     def unique_id(self) -> str:
         """Return a unique ID for this entity."""
         return f"{DOMAIN}_{self._system_id}_ventilation_level"
@@ -245,9 +261,19 @@ class BrinkHomeVentilationLevelSelectEntity(BrinkHomeSelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Set the ventilation level, switching to Manual mode first."""
+        controller = self.coordinator.automation_controller
+
+        if option == "ha_automated":
+            await controller.async_activate()
+            return
+
+        # If switching away from ha_automated, deactivate controller
+        if controller.state != AutomationState.IDLE:
+            await controller.async_deactivate()
+
+        # Original logic for levels 0-3
         value, vent_param, gateway_id = self._validate_for_write(option)
 
-        # Switch to Manual mode (1) first so the level change takes effect
         params_to_write: list[tuple[int, str]] = []
         mode_param = self._get_param_any_component(PARAM_OPERATING_MODE)
         if mode_param is None or mode_param.get("value_id") is None:
