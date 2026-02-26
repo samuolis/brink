@@ -94,6 +94,9 @@ class BrinkAutomationController:
         # Resilient write queue -- stores the most recent desired params on failure
         self._pending_writes: list[tuple[int, str]] | None = None
 
+        # Track whether automation was in BASE before boost (for correct return state)
+        self._was_in_base_before_boost: bool = False
+
         # Unsub handles
         self._boost_timer_unsub: CALLBACK_TYPE | None = None
         self._countdown_timer_unsub: CALLBACK_TYPE | None = None
@@ -178,6 +181,7 @@ class BrinkAutomationController:
         self._remove_humidity_listeners()
         self._humidity_windows.clear()
         self._pending_writes = None
+        self._was_in_base_before_boost = False
         self._state = AutomationState.IDLE
 
     async def async_activate_extra_ventilation(self) -> None:
@@ -186,6 +190,8 @@ class BrinkAutomationController:
         Sets the device to the seasonal max level in manual mode and starts
         the boost timer.
         """
+        self._was_in_base_before_boost = self._state == AutomationState.BASE
+
         self._season = self._evaluate_season()
         max_level = self._get_seasonal_max_level()
         duration_minutes: int = int(
@@ -352,19 +358,26 @@ class BrinkAutomationController:
         self._cancel_countdown_timer()
 
         if self._state == AutomationState.BOOSTED:
-            _LOGGER.info("Boost timer expired, transitioning to BASE")
-            self._state = AutomationState.BASE
-            self._season = self._evaluate_season()
+            if self._was_in_base_before_boost:
+                _LOGGER.info("Boost timer expired, transitioning to BASE")
+                self._state = AutomationState.BASE
+                self._season = self._evaluate_season()
 
-            base_level = self._get_seasonal_base_level()
-            params = self._build_mode_and_level_params(
-                mode_value="1", level_value=str(base_level)
-            )
-            if params:
-                self._hass.async_create_task(self.async_write_params(params))
+                base_level = self._get_seasonal_base_level()
+                params = self._build_mode_and_level_params(
+                    mode_value="1", level_value=str(base_level)
+                )
+                if params:
+                    self._hass.async_create_task(self.async_write_params(params))
 
-            # Resume humidity monitoring (was paused during boost)
-            self._start_humidity_listeners()
+                # Resume humidity monitoring (was paused during boost)
+                self._start_humidity_listeners()
+            else:
+                _LOGGER.info(
+                    "Boost timer expired, transitioning to IDLE "
+                    "(boost was triggered outside ha_automated mode)"
+                )
+                self._state = AutomationState.IDLE
         else:
             _LOGGER.debug("Boost timer expired but state is %s", self._state)
 
