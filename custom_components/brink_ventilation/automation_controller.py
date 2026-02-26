@@ -8,6 +8,7 @@ write queue that retries failed API writes on the next coordinator refresh.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections import deque
 from enum import StrEnum
@@ -143,6 +144,33 @@ class BrinkAutomationController:
             if entity_id:
                 sensors.append(entity_id)
         return sensors
+
+    @property
+    def humidity_deltas(self) -> dict[str, float]:
+        """Return current humidity delta (newest - oldest) for each monitored sensor.
+
+        Returns a dict of entity_id -> delta value. Delta is 0.0 if window
+        has fewer than 2 readings.
+        """
+        deltas: dict[str, float] = {}
+        for entity_id, window in self._humidity_windows.items():
+            if len(window) >= 2:
+                deltas[entity_id] = round(window[-1][1] - window[0][1], 1)
+            else:
+                deltas[entity_id] = 0.0
+        return deltas
+
+    @property
+    def max_humidity_delta(self) -> float:
+        """Return the maximum humidity delta across all monitored sensors.
+
+        This is the most useful single number for the user — shows the highest
+        spike happening right now across all sensors.
+        """
+        deltas = self.humidity_deltas
+        if not deltas:
+            return 0.0
+        return max(deltas.values())
 
     # ------------------------------------------------------------------
     # Public methods
@@ -449,12 +477,21 @@ class BrinkAutomationController:
             return
 
         state_value = new_state.state
-        if state_value in (None, "unavailable", "unknown"):
+        if state_value in (None, "", "unavailable", "unknown"):
             return
 
         try:
             value = float(state_value)
         except (ValueError, TypeError):
+            return
+
+        # Guard against NaN, Infinity, and physically impossible values
+        if math.isnan(value) or math.isinf(value):
+            _LOGGER.debug("Ignoring non-finite humidity value from %s: %s", entity_id, value)
+            return
+
+        if value < 0.0 or value > 100.0:
+            _LOGGER.debug("Ignoring out-of-range humidity value from %s: %.1f", entity_id, value)
             return
 
         now = time.monotonic()

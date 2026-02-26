@@ -91,6 +91,9 @@
           "summer": "mdi:weather-sunny",
           "winter": "mdi:snowflake"
         }
+      },
+      "humidity_delta": {
+        "default": "mdi:water-percent-alert"
       }
     },
     "binary_sensor": {

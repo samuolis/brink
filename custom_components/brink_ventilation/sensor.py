@@ -235,6 +235,7 @@ async def async_setup_entry(
             entities.append(
                 BrinkCurrentSeasonEntity(coordinator, system_id)
             )
+            entities.append(BrinkHumidityDeltaEntity(coordinator, system_id))
 
         if entities:
             _LOGGER.debug("Adding %s sensor entities", len(entities))
@@ -356,3 +357,35 @@ class BrinkCurrentSeasonEntity(BrinkHomeDeviceEntity, SensorEntity):
     def native_value(self) -> str | None:
         """Return the current season."""
         return self.coordinator.automation_controller.season
+
+
+class BrinkHumidityDeltaEntity(BrinkHomeDeviceEntity, SensorEntity):
+    """Sensor showing the maximum humidity change across monitored sensors."""
+
+    _attr_translation_key = "humidity_delta"
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator: BrinkDataCoordinator,
+        system_id: int,
+    ) -> None:
+        """Initialize the humidity delta sensor."""
+        super().__init__(coordinator, system_id, PARAM_VENTILATION_LEVEL, "humidity_delta")
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID for this entity."""
+        return f"{DOMAIN}_{self._system_id}_humidity_delta"
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self.coordinator.last_update_success and self._device is not None
+
+    @property
+    def native_value(self) -> float:
+        """Return the maximum humidity delta across all monitored sensors."""
+        return self.coordinator.automation_controller.max_humidity_delta

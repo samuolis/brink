@@ -215,6 +215,9 @@
           "summer": "Summer",
           "winter": "Winter"
         }
+      },
+      "humidity_delta": {
+        "name": "Humidity change (3 min)"
       }
     },
     "button": {

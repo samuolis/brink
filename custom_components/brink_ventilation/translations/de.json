@@ -188,6 +188,9 @@
           "summer": "Sommer",
           "winter": "Winter"
         }
+      },
+      "humidity_delta": {
+        "name": "Luftfeuchtigkeitsänderung (3 Min.)"
       }
     },
     "button": {
