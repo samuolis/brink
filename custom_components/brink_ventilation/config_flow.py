@@ -23,15 +23,49 @@ from homeassistant.helpers.aiohttp_client import (
     async_get_clientsession,
 )
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
 )
 
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL
+from .const import (
+    CONF_AUTO_SUMMER_BASE_LEVEL,
+    CONF_AUTO_WINTER_BASE_LEVEL,
+    CONF_EXTRA_VENT_DURATION,
+    CONF_EXTRA_VENT_SUMMER_LEVEL,
+    CONF_EXTRA_VENT_WINTER_LEVEL,
+    CONF_FREEZING_THRESHOLD,
+    CONF_HUMIDITY_SENSOR_1,
+    CONF_HUMIDITY_SENSOR_2,
+    CONF_HUMIDITY_SENSOR_3,
+    CONF_HUMIDITY_SPIKE_THRESHOLD,
+    CONF_TEMPERATURE_SOURCE_ENTITY,
+    DEFAULT_AUTO_SUMMER_BASE_LEVEL,
+    DEFAULT_AUTO_WINTER_BASE_LEVEL,
+    DEFAULT_EXTRA_VENT_DURATION,
+    DEFAULT_EXTRA_VENT_SUMMER_LEVEL,
+    DEFAULT_EXTRA_VENT_WINTER_LEVEL,
+    DEFAULT_FREEZING_THRESHOLD,
+    DEFAULT_HUMIDITY_SPIKE_THRESHOLD,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    MAX_EXTRA_VENT_DURATION,
+    MAX_FREEZING_THRESHOLD,
+    MAX_HUMIDITY_SPIKE_THRESHOLD,
+    MAX_SCAN_INTERVAL,
+    MIN_EXTRA_VENT_DURATION,
+    MIN_FREEZING_THRESHOLD,
+    MIN_HUMIDITY_SPIKE_THRESHOLD,
+    MIN_SCAN_INTERVAL,
+)
 from .core.brink_home_cloud import BrinkAuthError, BrinkHomeCloud
 
 _LOGGER = logging.getLogger(__name__)
@@ -227,41 +261,224 @@ class BrinkHomeConfigFlow(ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(OptionsFlow):
     """Handle an options flow for Brink-home."""
 
+    def __init__(self) -> None:
+        """Initialize options flow."""
+        self._options_data: dict[str, Any] = {}
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle options flow."""
+        """Step 1: General settings."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             scan_interval = int(user_input.get(
                 CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
             ))
-            if scan_interval < MIN_SCAN_INTERVAL:
+            if scan_interval < MIN_SCAN_INTERVAL or scan_interval > MAX_SCAN_INTERVAL:
                 errors["base"] = "scan_interval_too_low"
             else:
-                return self.async_create_entry(title="", data=user_input)
+                self._options_data.update(user_input)
+                return await self.async_step_extra_ventilation()
 
-        default_interval = (
-            user_input or self.config_entry.options
-        ).get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        opts = user_input or self.config_entry.options
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
                     vol.Required(
-                        CONF_SCAN_INTERVAL, default=default_interval
+                        CONF_SCAN_INTERVAL,
+                        default=opts.get(
+                            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                        ),
                     ): NumberSelector(
                         NumberSelectorConfig(
                             min=MIN_SCAN_INTERVAL,
-                            max=3600,
+                            max=MAX_SCAN_INTERVAL,
                             step=1,
                             mode=NumberSelectorMode.BOX,
                             unit_of_measurement="seconds",
                         )
                     ),
+                    vol.Required(
+                        CONF_FREEZING_THRESHOLD,
+                        default=opts.get(
+                            CONF_FREEZING_THRESHOLD, DEFAULT_FREEZING_THRESHOLD
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=MIN_FREEZING_THRESHOLD,
+                            max=MAX_FREEZING_THRESHOLD,
+                            step=0.5,
+                            mode=NumberSelectorMode.BOX,
+                            unit_of_measurement="\u00b0C",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_TEMPERATURE_SOURCE_ENTITY,
+                        description={
+                            "suggested_value": opts.get(
+                                CONF_TEMPERATURE_SOURCE_ENTITY
+                            )
+                        },
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="temperature",
+                        )
+                    ),
                 }
             ),
             errors=errors,
+        )
+
+    async def async_step_extra_ventilation(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step 2: Extra ventilation settings."""
+        if user_input is not None:
+            self._options_data.update(user_input)
+            return await self.async_step_ha_automated()
+
+        opts = self.config_entry.options
+
+        return self.async_show_form(
+            step_id="extra_ventilation",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_EXTRA_VENT_DURATION,
+                        default=opts.get(
+                            CONF_EXTRA_VENT_DURATION, DEFAULT_EXTRA_VENT_DURATION
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=MIN_EXTRA_VENT_DURATION,
+                            max=MAX_EXTRA_VENT_DURATION,
+                            step=1,
+                            mode=NumberSelectorMode.BOX,
+                            unit_of_measurement="minutes",
+                        )
+                    ),
+                    vol.Required(
+                        CONF_EXTRA_VENT_SUMMER_LEVEL,
+                        default=opts.get(
+                            CONF_EXTRA_VENT_SUMMER_LEVEL,
+                            str(DEFAULT_EXTRA_VENT_SUMMER_LEVEL),
+                        ),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=["1", "2", "3"],
+                            mode=SelectSelectorMode.DROPDOWN,
+                            translation_key=None,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_EXTRA_VENT_WINTER_LEVEL,
+                        default=opts.get(
+                            CONF_EXTRA_VENT_WINTER_LEVEL,
+                            str(DEFAULT_EXTRA_VENT_WINTER_LEVEL),
+                        ),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=["1", "2", "3"],
+                            mode=SelectSelectorMode.DROPDOWN,
+                            translation_key=None,
+                        )
+                    ),
+                }
+            ),
+        )
+
+    async def async_step_ha_automated(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step 3: HA automated mode settings."""
+        if user_input is not None:
+            self._options_data.update(user_input)
+            return self.async_create_entry(title="", data=self._options_data)
+
+        opts = self.config_entry.options
+
+        return self.async_show_form(
+            step_id="ha_automated",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_AUTO_SUMMER_BASE_LEVEL,
+                        default=opts.get(
+                            CONF_AUTO_SUMMER_BASE_LEVEL,
+                            str(DEFAULT_AUTO_SUMMER_BASE_LEVEL),
+                        ),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=["0", "1", "2", "3"],
+                            mode=SelectSelectorMode.DROPDOWN,
+                            translation_key=None,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_AUTO_WINTER_BASE_LEVEL,
+                        default=opts.get(
+                            CONF_AUTO_WINTER_BASE_LEVEL,
+                            str(DEFAULT_AUTO_WINTER_BASE_LEVEL),
+                        ),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=["0", "1", "2", "3"],
+                            mode=SelectSelectorMode.DROPDOWN,
+                            translation_key=None,
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_HUMIDITY_SENSOR_1,
+                        description={
+                            "suggested_value": opts.get(CONF_HUMIDITY_SENSOR_1)
+                        },
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="humidity",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_HUMIDITY_SENSOR_2,
+                        description={
+                            "suggested_value": opts.get(CONF_HUMIDITY_SENSOR_2)
+                        },
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="humidity",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_HUMIDITY_SENSOR_3,
+                        description={
+                            "suggested_value": opts.get(CONF_HUMIDITY_SENSOR_3)
+                        },
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="humidity",
+                        )
+                    ),
+                    vol.Required(
+                        CONF_HUMIDITY_SPIKE_THRESHOLD,
+                        default=opts.get(
+                            CONF_HUMIDITY_SPIKE_THRESHOLD,
+                            DEFAULT_HUMIDITY_SPIKE_THRESHOLD,
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=MIN_HUMIDITY_SPIKE_THRESHOLD,
+                            max=MAX_HUMIDITY_SPIKE_THRESHOLD,
+                            step=0.5,
+                            mode=NumberSelectorMode.BOX,
+                            unit_of_measurement="%",
+                        )
+                    ),
+                }
+            ),
         )
