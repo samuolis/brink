@@ -7,17 +7,44 @@
         "data": {
           "username": "Email",
           "password": "Password"
+        },
+        "data_description": {
+          "username": "The email address you use to log into the Brink Home portal.",
+          "password": "Your Brink Home portal password."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Brink Home",
+        "description": "Your session for {username} has expired. Please enter your password to re-authenticate.",
+        "data": {
+          "password": "Password"
+        },
+        "data_description": {
+          "password": "Your Brink Home portal password."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Brink Home",
+        "description": "Update your Brink Home portal credentials.",
+        "data": {
+          "username": "Email",
+          "password": "Password"
+        },
+        "data_description": {
+          "username": "The email address you use to log into the Brink Home portal.",
+          "password": "Your Brink Home portal password."
         }
       }
     },
     "error": {
-      "cannot_connect": "Can't connect. Try again later.",
+      "cannot_connect": "Can't connect to the Brink Home portal. Try again later.",
       "invalid_auth": "Email or password is incorrect.",
-      "unknown": "Unknown error."
+      "unknown": "An unexpected error occurred."
     },
     "abort": {
-      "already_configured": "Account is already configured.",
-      "reauth_successful": "Re-authentication was successful."
+      "already_configured": "This account is already configured.",
+      "reauth_successful": "Re-authentication was successful.",
+      "account_mismatch": "The account does not match the one being reconfigured."
     }
   },
   "options": {
@@ -26,7 +53,10 @@
         "title": "Configure Brink Home integration",
         "description": "Set how often to poll the Brink Home API for updates. Minimum is 15 seconds.",
         "data": {
-          "scan_interval": "Scan interval (seconds)"
+          "scan_interval": "Scan interval"
+        },
+        "data_description": {
+          "scan_interval": "How often (in seconds) to poll the Brink Home API for updates. Lower values increase responsiveness but also API load."
         }
       }
     },
@@ -142,6 +172,29 @@
       "filter_status": {
         "name": "Filter status"
       }
+    }
+  },
+  "exceptions": {
+    "unknown_option": {
+      "message": "Unknown option: {option}"
+    },
+    "parameter_unavailable": {
+      "message": "Parameter not available for {entity_key}. The device may be offline."
+    },
+    "gateway_unavailable": {
+      "message": "Cannot send command: gateway not available. The Brink Home portal may be experiencing issues."
+    },
+    "parameter_read_only": {
+      "message": "Cannot send command: parameter {entity_key} is read-only."
+    },
+    "write_failed": {
+      "message": "Failed to set {entity_key}: {error}"
+    }
+  },
+  "issues": {
+    "gateway_not_available": {
+      "title": "Gateway not available for {device_name}",
+      "description": "The gateway for your Brink ventilation device \"{device_name}\" is not reachable. Write commands (changing mode, ventilation level, bypass) will not work until the gateway comes back online. Check that your Brink device is powered on and connected to the internet."
     }
   }
 }

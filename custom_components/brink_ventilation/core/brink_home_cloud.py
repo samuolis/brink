@@ -1,11 +1,15 @@
 """Brink Home Cloud API client with dual authentication (OIDC + old portal)."""
+
+from __future__ import annotations
+
 import asyncio
 import base64
 import hashlib
 import logging
-import re
 import secrets
 import time
+from html.parser import HTMLParser
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import aiohttp
@@ -22,7 +26,7 @@ from ..const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-_OLD_API_HEADERS = {
+_OLD_API_HEADERS: dict[str, str] = {
     "X-Requested-With": "XMLHttpRequest",
     "Content-Type": "application/json; charset=UTF-8",
 }
@@ -36,10 +40,18 @@ def _is_trusted_url(url: str) -> bool:
         parsed = urlparse(url)
     except ValueError:
         return False
-    return parsed.scheme == "https" and parsed.hostname == _TRUSTED_HOST
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname == _TRUSTED_HOST
+        and parsed.port in (None, 443)
+    )
 
 
-def _extract_parameters(nav_item: dict, parameters: dict, _depth: int = 0) -> None:
+def _extract_parameters(
+    nav_item: dict[str, Any],
+    parameters: dict[int, dict[str, Any]],
+    _depth: int = 0,
+) -> None:
     """Recursively extract parameters from a navigation item tree."""
     if _depth > 20:
         _LOGGER.warning("Maximum navigation depth reached, stopping recursion")
@@ -67,17 +79,43 @@ def _extract_parameters(nav_item: dict, parameters: dict, _depth: int = 0) -> No
         _extract_parameters(child, parameters, _depth + 1)
 
 
+class _InputFieldExtractor(HTMLParser):
+    """Extract values from HTML <input> elements by field name."""
+
+    def __init__(self, target_names: set[str]) -> None:
+        super().__init__()
+        self._targets = {n.lower() for n in target_names}
+        self.results: dict[str, str] = {}
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "input":
+            return
+        attr_dict = {k.lower(): (v or "") for k, v in attrs}
+        name = attr_dict.get("name", "").lower()
+        if name in self._targets and "value" in attr_dict:
+            self.results[name] = attr_dict["value"]
+
+
 class BrinkHomeCloud:
     """Interacts with Brink Home via v1.1 API (reads) and old portal API (writes)."""
 
     def __init__(
         self,
         session: aiohttp.ClientSession,
+        old_session: aiohttp.ClientSession,
         username: str,
         password: str,
-    ):
-        """Initialize the Brink Home Cloud client."""
+    ) -> None:
+        """Initialize the Brink Home Cloud client.
+
+        Args:
+            session: HA shared session (no cookies) for v1.1 API.
+            old_session: HA-managed session with CookieJar for old portal API.
+            username: Brink Home portal username.
+            password: Brink Home portal password.
+        """
         self._session = session
+        self._old_session = old_session
         self._username = username
         self._password = password
 
@@ -85,10 +123,11 @@ class BrinkHomeCloud:
         self._access_token: str | None = None
         self._token_expiry: float = 0.0
 
-        # Old API uses cookie-based auth and needs its own session
-        # (HA's shared session uses DummyCookieJar which discards cookies)
-        self._old_session: aiohttp.ClientSession | None = None
-        self._old_api_authenticated = False
+        # Old API cookie auth state
+        self._old_api_authenticated: bool = False
+
+        # Cache of last known good gateway map for resilience
+        self._cached_gateway_map: dict[int, int] = {}
 
     # -------------------------------------------------------------------------
     # Public API methods
@@ -100,17 +139,17 @@ class BrinkHomeCloud:
         await self._old_api_login()
 
     async def close(self) -> None:
-        """Close sessions and clear sensitive state. Call on integration unload."""
-        if self._old_session and not self._old_session.closed:
-            await self._old_session.close()
-            self._old_session = None
+        """Clear sensitive state. Call on integration unload.
 
-        # Clear sensitive credentials from memory
+        Sessions are HA-managed and will be closed by HA automatically.
+        """
         self._access_token = None
         self._token_expiry = 0.0
         self._old_api_authenticated = False
+        self._username = ""
+        self._password = ""
 
-    async def get_systems(self) -> list[dict]:
+    async def get_systems(self) -> list[dict[str, Any]]:
         """Get list of systems by combining v1.1 API (info) and old API (gateway_id)."""
         await self._ensure_token()
 
@@ -132,7 +171,11 @@ class BrinkHomeCloud:
         # Get systems from old API (has gatewayId)
         gateway_map = await self._get_old_api_systems()
 
-        systems = []
+        # Update cache on successful fetch
+        if gateway_map:
+            self._cached_gateway_map.update(gateway_map)
+
+        systems: list[dict[str, Any]] = []
         for item in v1_data.get("items", []):
             system_id = item.get("systemShareId")
             if system_id is None:
@@ -141,10 +184,12 @@ class BrinkHomeCloud:
                     list(item.keys()) if isinstance(item, dict) else type(item).__name__,
                 )
                 continue
+            # Fall back to cached gateway_id if old API failed
+            gw_id = gateway_map.get(system_id) or self._cached_gateway_map.get(system_id)
             systems.append(
                 {
                     "system_id": system_id,
-                    "gateway_id": gateway_map.get(system_id),
+                    "gateway_id": gw_id,
                     "name": item.get("systemName", "Brink"),
                     "serial_number": item.get("serialNumber", ""),
                     "gateway_state": item.get("gatewayState"),
@@ -158,7 +203,7 @@ class BrinkHomeCloud:
 
     async def _get_old_api_systems(self) -> dict[int, int]:
         """Return a system_id -> gateway_id mapping from the old portal API."""
-        await self._ensure_old_session()
+        await self._ensure_old_api()
 
         url = f"{API_URL}GetSystemList"
         try:
@@ -169,18 +214,20 @@ class BrinkHomeCloud:
                 )
                 if resp.status == 401:
                     _LOGGER.debug("GetSystemList got 401, re-authenticating")
+                    await resp.release()
                     await self._old_api_login()
-                    resp = await self._old_session.get(
-                        url,
-                        headers=_OLD_API_HEADERS,
-                    )
+                    async with asyncio.timeout(20):
+                        resp = await self._old_session.get(
+                            url,
+                            headers=_OLD_API_HEADERS,
+                        )
                 resp.raise_for_status()
                 data = await resp.json()
         except (aiohttp.ClientError, asyncio.TimeoutError):
             _LOGGER.warning("Could not fetch gateway map from old API")
             return {}
 
-        gateway_map = {}
+        gateway_map: dict[int, int] = {}
         for system in data:
             sys_id = system.get("id")
             gw_id = system.get("gatewayId")
@@ -190,11 +237,12 @@ class BrinkHomeCloud:
         _LOGGER.debug("Old API gateway map: %s", gateway_map)
         return gateway_map
 
-    async def get_device_data(self, system_id: int) -> dict:
+    async def get_device_data(self, system_id: int) -> dict[str, Any]:
         """Get all parameters for a system from the v1.1 uidescription endpoint."""
-        # Validate system_id is an integer to prevent URL path injection
         if not isinstance(system_id, int):
-            raise ValueError(f"system_id must be an integer, got {type(system_id).__name__}")
+            raise ValueError(
+                f"system_id must be an integer, got {type(system_id).__name__}"
+            )
 
         await self._ensure_token()
 
@@ -211,12 +259,6 @@ class BrinkHomeCloud:
 
         return self._parse_uidescription(data)
 
-    async def write_parameter(
-        self, system_id: int, gateway_id: int, value_id: int, value: str
-    ) -> None:
-        """Write a single parameter value via the old portal API."""
-        await self.write_parameters(system_id, gateway_id, [(value_id, value)])
-
     async def write_parameters(
         self,
         system_id: int,
@@ -224,13 +266,12 @@ class BrinkHomeCloud:
         params: list[tuple[int, str]],
     ) -> None:
         """Write multiple parameter values in one bundle via the old portal API."""
-        # Validate IDs are integers to prevent injection in JSON payload
         if not isinstance(system_id, int) or not isinstance(gateway_id, int):
             raise ValueError("system_id and gateway_id must be integers")
 
-        await self._ensure_old_session()
+        await self._ensure_old_api()
 
-        write_values = []
+        write_values: list[dict[str, Any]] = []
         for vid, val in params:
             if not isinstance(vid, int):
                 raise ValueError(
@@ -238,7 +279,7 @@ class BrinkHomeCloud:
                 )
             write_values.append({"ValueId": vid, "Value": val})
 
-        payload = {
+        payload: dict[str, Any] = {
             "GatewayId": gateway_id,
             "SystemId": system_id,
             "WriteParameterValues": write_values,
@@ -257,12 +298,19 @@ class BrinkHomeCloud:
                     headers=_OLD_API_HEADERS,
                 )
 
-            if resp.status == 401 and attempt == 0:
-                _LOGGER.debug("Write got 401, re-authenticating old API")
-                await self._old_api_login()
-                continue
+            if resp.status == 401:
+                await resp.release()
+                if attempt == 0:
+                    _LOGGER.debug("Write got 401, re-authenticating old API")
+                    await self._old_api_login()
+                    continue
+                raise BrinkAuthError("Write failed: persistent 401 after re-auth")
 
-            resp.raise_for_status()
+            try:
+                resp.raise_for_status()
+                await resp.read()
+            finally:
+                await resp.release()
             return
 
     # -------------------------------------------------------------------------
@@ -276,10 +324,10 @@ class BrinkHomeCloud:
         state = secrets.token_urlsafe(32)
         nonce = secrets.token_urlsafe(32)
 
-        jar = aiohttp.CookieJar(unsafe=True)
+        jar = aiohttp.CookieJar(unsafe=False)
         async with aiohttp.ClientSession(cookie_jar=jar) as oidc_session:
             # Step 1: GET authorize endpoint
-            auth_params = {
+            auth_params: dict[str, str] = {
                 "client_id": OIDC_CLIENT_ID,
                 "redirect_uri": OIDC_REDIRECT_URI,
                 "response_type": "code",
@@ -290,6 +338,8 @@ class BrinkHomeCloud:
                 "code_challenge_method": "S256",
             }
 
+            # allow_redirects=True is safe here: this is a fresh session with no
+            # sensitive cookies yet.  The final URL is validated below.
             _LOGGER.debug("Starting OIDC authorize request")
             async with asyncio.timeout(30):
                 auth_resp = await oidc_session.get(
@@ -307,7 +357,6 @@ class BrinkHomeCloud:
             login_url = str(auth_resp.url)
 
             # Validate that the login form URL is on the trusted domain
-            # to prevent posting credentials to a hostile redirect target
             if not _is_trusted_url(login_url):
                 raise BrinkAuthError(
                     f"OIDC login page redirected to untrusted host: "
@@ -315,36 +364,34 @@ class BrinkHomeCloud:
                 )
 
             # Step 2: Parse CSRF token and ReturnUrl from login form
-            csrf_token = self._parse_csrf_token(login_page_html)
+            form_fields = self._extract_form_fields(login_page_html)
+            csrf_token = form_fields.get("__requestverificationtoken")
             if not csrf_token:
                 raise BrinkAuthError(
                     "Could not find CSRF token in OIDC login page"
                 )
 
-            return_url = self._parse_return_url(login_page_html)
+            return_url = form_fields.get("returnurl")
 
             # Step 3: POST login form
-            form_data = {
+            form_data: dict[str, str] = {
                 "Username": self._username,
                 "Password": self._password,
                 "__RequestVerificationToken": csrf_token,
             }
             if return_url:
-                parsed_return = urlparse(return_url)
-                if parsed_return.scheme in ("", "https") and (
-                    not parsed_return.hostname
-                    or parsed_return.hostname == _TRUSTED_HOST
-                ):
+                if return_url.startswith("/") and not return_url.startswith("//"):
+                    # Relative path — safe
+                    form_data["ReturnUrl"] = return_url
+                elif _is_trusted_url(return_url):
+                    # Absolute URL on trusted domain
                     form_data["ReturnUrl"] = return_url
                 else:
                     _LOGGER.warning(
-                        "Ignoring untrusted ReturnUrl: %s",
-                        parsed_return.hostname,
+                        "Ignoring untrusted ReturnUrl hostname"
                     )
 
-            _LOGGER.debug(
-                "Posting OIDC login form for user %s", self._username
-            )
+            _LOGGER.debug("Posting OIDC login form")
             async with asyncio.timeout(30):
                 login_resp = await oidc_session.post(
                     login_url,
@@ -352,10 +399,11 @@ class BrinkHomeCloud:
                     allow_redirects=False,
                 )
 
-            authorization_code = None
+            authorization_code: str | None = None
 
             if login_resp.status in (301, 302, 303, 307):
                 redirect_location = login_resp.headers.get("Location", "")
+                await login_resp.release()
                 authorization_code = self._extract_code_from_redirect(
                     redirect_location, expected_state=state
                 )
@@ -387,7 +435,7 @@ class BrinkHomeCloud:
             _LOGGER.debug("Got authorization code, exchanging for token")
 
         # Step 4: Exchange authorization code for token
-        token_data = {
+        token_data: dict[str, str] = {
             "grant_type": "authorization_code",
             "code": authorization_code,
             "redirect_uri": OIDC_REDIRECT_URI,
@@ -403,6 +451,7 @@ class BrinkHomeCloud:
             )
 
         if token_resp.status != 200:
+            await token_resp.release()
             _LOGGER.error(
                 "Token exchange failed with HTTP %s", token_resp.status
             )
@@ -413,15 +462,12 @@ class BrinkHomeCloud:
         token_json = await token_resp.json()
         access_token = token_json.get("access_token")
         if not access_token:
-            _LOGGER.error(
-                "Token response missing access_token: %s",
-                list(token_json.keys()),
-            )
+            _LOGGER.error("Token response did not contain expected fields")
             raise BrinkAuthError(
                 "OIDC token response did not contain an access token"
             )
         self._access_token = access_token
-        expires_in = token_json.get("expires_in", 3599)
+        expires_in: int = token_json.get("expires_in", 3599)
         self._token_expiry = time.monotonic() + expires_in - 60
 
         _LOGGER.debug(
@@ -439,7 +485,6 @@ class BrinkHomeCloud:
 
         Only follows redirects that stay on the trusted Brink Home domain
         (HTTPS) to prevent leaking the authorization code to a hostile server.
-        Relative paths are resolved against the base URL.
         """
         max_redirects = 10
         current_url = redirect_url
@@ -451,14 +496,12 @@ class BrinkHomeCloud:
                     f"{parsed_base.scheme}://{parsed_base.netloc}{current_url}"
                 )
 
-            # Check for auth code before making a request
             code = self._extract_code_from_redirect(
                 current_url, expected_state=expected_state
             )
             if code:
                 return code
 
-            # Only follow redirects to the trusted Brink domain over HTTPS
             if not _is_trusted_url(current_url):
                 _LOGGER.warning(
                     "Refusing to follow redirect to untrusted URL: %s",
@@ -474,11 +517,14 @@ class BrinkHomeCloud:
 
                 if resp.status in (301, 302, 303, 307):
                     current_url = resp.headers.get("Location", "")
+                    await resp.release()
                     if not current_url:
                         break
                 else:
+                    resp_url = str(resp.url)
+                    await resp.release()
                     final_code = self._extract_code_from_redirect(
-                        str(resp.url), expected_state=expected_state
+                        resp_url, expected_state=expected_state
                     )
                     if final_code:
                         return final_code
@@ -493,29 +539,20 @@ class BrinkHomeCloud:
     # Old Portal API Authentication
     # -------------------------------------------------------------------------
 
-    async def _ensure_old_session(self) -> None:
-        """Ensure the old API session exists and is authenticated."""
-        if self._old_session is None or self._old_session.closed:
-            jar = aiohttp.CookieJar(unsafe=True)
-            self._old_session = aiohttp.ClientSession(cookie_jar=jar)
-            self._old_api_authenticated = False
-
+    async def _ensure_old_api(self) -> None:
+        """Ensure the old API session is authenticated."""
         if not self._old_api_authenticated:
             await self._old_api_login()
 
     async def _old_api_login(self) -> None:
         """Authenticate with the old portal API to get session cookies for writes."""
-        if self._old_session is None or self._old_session.closed:
-            jar = aiohttp.CookieJar(unsafe=True)
-            self._old_session = aiohttp.ClientSession(cookie_jar=jar)
-
-        data = {
+        data: dict[str, str] = {
             "UserName": self._username,
             "Password": self._password,
         }
         url = f"{API_URL}UserLogon"
 
-        _LOGGER.debug("Logging into old portal API for user %s", self._username)
+        _LOGGER.debug("Logging into old portal API")
 
         try:
             async with asyncio.timeout(20):
@@ -525,7 +562,14 @@ class BrinkHomeCloud:
                     headers=_OLD_API_HEADERS,
                 )
                 resp.raise_for_status()
-                await resp.json()  # consume body
+                await resp.read()  # consume body
+        except aiohttp.ClientResponseError as ex:
+            self._old_api_authenticated = False
+            if ex.status in (401, 403):
+                raise BrinkAuthError(
+                    f"Old API login failed (HTTP {ex.status})"
+                ) from ex
+            raise
         except (aiohttp.ClientError, asyncio.TimeoutError):
             self._old_api_authenticated = False
             raise
@@ -557,18 +601,17 @@ class BrinkHomeCloud:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def _parse_uidescription(data: dict) -> dict:
+    def _parse_uidescription(data: dict[str, Any]) -> dict[str, Any]:
         """Parse the v1.1 uidescription response into components with parameters."""
-        result = {"components": []}
-
         nav_items = data.get("root", {}).get("navigationItems", [])
 
+        components: list[dict[str, Any]] = []
         for nav_item in nav_items:
-            parameters = {}
+            parameters: dict[int, dict[str, Any]] = {}
             _extract_parameters(nav_item, parameters)
 
             if parameters:
-                result["components"].append(
+                components.append(
                     {
                         "component_id": nav_item.get("componentId"),
                         "name": nav_item.get("name", "Unknown"),
@@ -576,41 +619,19 @@ class BrinkHomeCloud:
                     }
                 )
 
-        return result
+        return {"components": components}
 
     @staticmethod
-    def _parse_csrf_token(html: str) -> str | None:
-        """Extract __RequestVerificationToken from login form HTML."""
-        match = re.search(
-            r'name="__RequestVerificationToken"[\s\S]*?value="([^"]+)"', html
+    def _extract_form_fields(html: str) -> dict[str, str]:
+        """Extract input field values from login form HTML.
+
+        Uses stdlib html.parser for resilience against HTML reformatting.
+        """
+        extractor = _InputFieldExtractor(
+            {"__RequestVerificationToken", "ReturnUrl"}
         )
-        if match:
-            return match.group(1)
-
-        match = re.search(
-            r'value="([^"]+)"[\s\S]*?name="__RequestVerificationToken"', html
-        )
-        if match:
-            return match.group(1)
-
-        return None
-
-    @staticmethod
-    def _parse_return_url(html: str) -> str | None:
-        """Extract ReturnUrl hidden field from login form HTML."""
-        match = re.search(
-            r'name="ReturnUrl"[\s\S]*?value="([^"]*)"', html
-        )
-        if match:
-            return match.group(1)
-
-        match = re.search(
-            r'value="([^"]*)"\s+.*?name="ReturnUrl"', html
-        )
-        if match:
-            return match.group(1)
-
-        return None
+        extractor.feed(html)
+        return extractor.results
 
     @staticmethod
     def _extract_code_from_redirect(
@@ -625,7 +646,6 @@ class BrinkHomeCloud:
             parsed = urlparse(url)
             params = parse_qs(parsed.query)
 
-            # Validate state if provided (OAuth CSRF protection)
             if expected_state is not None:
                 returned_states = params.get("state")
                 if not returned_states or returned_states[0] != expected_state:

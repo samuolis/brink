@@ -1,63 +1,93 @@
 """Config flow for Brink-home."""
+
 from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 import aiohttp
 import voluptuous as vol
 
-from homeassistant import config_entries
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
-from homeassistant.core import callback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import (
+    async_create_clientsession,
+    async_get_clientsession,
+)
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL
 from .core.brink_home_cloud import BrinkAuthError, BrinkHomeCloud
 
 _LOGGER = logging.getLogger(__name__)
 
-DATA_SCHEMA = vol.Schema(
+STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_USERNAME): str,
-        vol.Required(CONF_PASSWORD): str,
+        vol.Required(CONF_USERNAME): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.EMAIL, autocomplete="email")
+        ),
+        vol.Required(CONF_PASSWORD): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password")
+        ),
     }
 )
 
 
-class BrinkHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+async def _async_test_credentials(
+    hass: HomeAssistant, username: str, password: str
+) -> None:
+    """Test credentials by attempting to log in.
+
+    Raises BrinkAuthError or aiohttp exceptions on failure.
+    """
+    session = async_get_clientsession(hass)
+    temp_old_session = async_create_clientsession(
+        hass, cookie_jar=aiohttp.CookieJar(unsafe=False)
+    )
+    try:
+        client = BrinkHomeCloud(session, temp_old_session, username, password)
+        await client.login()
+    finally:
+        await temp_old_session.close()
+
+
+class BrinkHomeConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Brink-home."""
 
     VERSION = 1
 
-    def __init__(self):
-        """Initialize the config flow."""
-        self._reauth_entry = None
+    _username: str = ""
 
-    async def async_step_reauth(self, entry_data=None):
-        """Handle re-authentication."""
-        self._reauth_entry = self.hass.config_entries.async_get_entry(
-            self.context["entry_id"]
-        )
-        return await self.async_step_user()
-
-    async def async_step_user(self, user_input=None):
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
-        errors = {}
+        errors: dict[str, str] = {}
 
         if user_input is not None:
-            username = user_input[CONF_USERNAME]
-            password = user_input[CONF_PASSWORD]
+            username: str = user_input[CONF_USERNAME]
+            password: str = user_input[CONF_PASSWORD]
             unique_id = username.lower()
             await self.async_set_unique_id(unique_id)
-            if not self._reauth_entry:
-                self._abort_if_unique_id_configured()
-
-            session = async_get_clientsession(self.hass)
-            brink_client = BrinkHomeCloud(session, username, password)
+            self._abort_if_unique_id_configured()
 
             try:
-                await brink_client.login()
+                await _async_test_credentials(self.hass, username, password)
             except BrinkAuthError:
                 errors["base"] = "invalid_auth"
             except aiohttp.ClientResponseError as err:
@@ -71,54 +101,150 @@ class BrinkHomeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception during config flow")
                 errors["base"] = "unknown"
             else:
-                if not self._reauth_entry:
-                    return self.async_create_entry(
-                        title=username, data=user_input
-                    )
-                self.hass.config_entries.async_update_entry(
-                    self._reauth_entry,
-                    data=user_input,
-                    unique_id=unique_id,
+                return self.async_create_entry(
+                    title=username, data=user_input
                 )
-                self.hass.async_create_task(
-                    self.hass.config_entries.async_reload(
-                        self._reauth_entry.entry_id
-                    )
-                )
-                return self.async_abort(reason="reauth_successful")
 
         return self.async_show_form(
-            step_id="user", data_schema=DATA_SCHEMA, errors=errors
+            step_id="user",
+            data_schema=STEP_USER_DATA_SCHEMA,
+            errors=errors,
+        )
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> ConfigFlowResult:
+        """Handle re-authentication."""
+        self._username = entry_data[CONF_USERNAME]
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle re-authentication confirmation."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            password: str = user_input[CONF_PASSWORD]
+
+            try:
+                await _async_test_credentials(
+                    self.hass, self._username, password
+                )
+            except BrinkAuthError:
+                errors["base"] = "invalid_auth"
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected exception during reauth")
+                errors["base"] = "unknown"
+            else:
+                return self.async_update_reload_and_abort(
+                    self._get_reauth_entry(),
+                    data_updates={
+                        CONF_USERNAME: self._username,
+                        CONF_PASSWORD: password,
+                    },
+                )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_PASSWORD): TextSelector(
+                        TextSelectorConfig(
+                            type=TextSelectorType.PASSWORD,
+                            autocomplete="current-password",
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+            description_placeholders={"username": self._username},
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            username: str = user_input[CONF_USERNAME]
+            password: str = user_input[CONF_PASSWORD]
+
+            try:
+                await _async_test_credentials(self.hass, username, password)
+            except BrinkAuthError:
+                errors["base"] = "invalid_auth"
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected exception during reconfigure")
+                errors["base"] = "unknown"
+            else:
+                await self.async_set_unique_id(username.lower())
+                self._abort_if_unique_id_mismatch(reason="account_mismatch")
+                return self.async_update_reload_and_abort(
+                    self._get_reconfigure_entry(),
+                    data_updates=user_input,
+                )
+
+        reconfigure_entry = self._get_reconfigure_entry()
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_USERNAME,
+                        default=reconfigure_entry.data.get(CONF_USERNAME, ""),
+                    ): TextSelector(
+                        TextSelectorConfig(
+                            type=TextSelectorType.EMAIL,
+                            autocomplete="email",
+                        )
+                    ),
+                    vol.Required(CONF_PASSWORD): TextSelector(
+                        TextSelectorConfig(
+                            type=TextSelectorType.PASSWORD,
+                            autocomplete="current-password",
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
         )
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry):
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> OptionsFlowHandler:
         """Get the options flow for this handler."""
         return OptionsFlowHandler()
 
 
-class OptionsFlowHandler(config_entries.OptionsFlow):
+class OptionsFlowHandler(OptionsFlow):
     """Handle an options flow for Brink-home."""
 
-    async def async_step_init(self, user_input=None):
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle options flow."""
-        errors = {}
+        errors: dict[str, str] = {}
 
         if user_input is not None:
-            scan_interval = user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+            scan_interval = int(user_input.get(
+                CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+            ))
             if scan_interval < MIN_SCAN_INTERVAL:
                 errors["base"] = "scan_interval_too_low"
             else:
                 return self.async_create_entry(title="", data=user_input)
 
-        # When re-showing form after validation error, preserve the user's input
-        if user_input is not None:
-            default_interval = user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-        else:
-            default_interval = self.config_entry.options.get(
-                CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-            )
+        default_interval = (
+            user_input or self.config_entry.options
+        ).get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
         return self.async_show_form(
             step_id="init",
@@ -126,7 +252,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 {
                     vol.Required(
                         CONF_SCAN_INTERVAL, default=default_interval
-                    ): int,
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=MIN_SCAN_INTERVAL,
+                            max=3600,
+                            step=1,
+                            mode=NumberSelectorMode.BOX,
+                            unit_of_measurement="seconds",
+                        )
+                    ),
                 }
             ),
             errors=errors,

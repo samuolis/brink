@@ -1,12 +1,10 @@
 """Constant values for the Brink Home component."""
 
-DOMAIN = "brink_ventilation"
-DEFAULT_NAME = "Brink"
-DEFAULT_MODEL = "Flair"
+from __future__ import annotations
 
-DATA_CLIENT = "brink_client"
-DATA_COORDINATOR = "coordinator"
-DATA_DEVICES = "systems"
+DOMAIN = "brink_ventilation"
+MANUFACTURER = "Brink"
+DEFAULT_MODEL = "Flair"
 
 DEFAULT_SCAN_INTERVAL = 60
 MIN_SCAN_INTERVAL = 15
@@ -48,7 +46,7 @@ PARAM_BYPASS_OPERATION = 17143
 
 # Value maps (API value -> translation key)
 # Display labels are defined in translations/{lang}.json
-ACTIVE_CONTROL_STATUS_MAP = {
+ACTIVE_CONTROL_STATUS_MAP: dict[str, str] = {
     "0": "standby",
     "1": "bootloader",
     "2": "non_blocking_error",
@@ -66,7 +64,7 @@ ACTIVE_CONTROL_STATUS_MAP = {
     "14": "auto_lan_wlan_local",
 }
 
-BYPASS_VALVE_STATUS_MAP = {
+BYPASS_VALVE_STATUS_MAP: dict[str, str] = {
     "0": "init",
     "1": "opening",
     "2": "closing",
@@ -74,33 +72,33 @@ BYPASS_VALVE_STATUS_MAP = {
     "4": "closed",
 }
 
-PREHEATER_STATUS_MAP = {
+PREHEATER_STATUS_MAP: dict[str, str] = {
     "0": "off",
     "1": "auto",
     "2": "lock_current",
     "3": "lock_maximum",
 }
 
-OPERATING_MODE_MAP = {
+OPERATING_MODE_MAP: dict[str, str] = {
     "0": "automatic",
     "1": "manual",
     "2": "holiday",
     "3": "party",
     "4": "night",
 }
-OPERATING_MODE_REVERSE = {v: k for k, v in OPERATING_MODE_MAP.items()}
+OPERATING_MODE_REVERSE: dict[str, str] = {v: k for k, v in OPERATING_MODE_MAP.items()}
 
-BYPASS_OPERATION_MAP = {
+BYPASS_OPERATION_MAP: dict[str, str] = {
     "0": "automatic",
     "1": "bypass_closed",
     "2": "bypass_open",
 }
-BYPASS_OPERATION_REVERSE = {v: k for k, v in BYPASS_OPERATION_MAP.items()}
+BYPASS_OPERATION_REVERSE: dict[str, str] = {v: k for k, v in BYPASS_OPERATION_MAP.items()}
 
-VENTILATION_LEVEL_MAP = {
+VENTILATION_LEVEL_MAP: dict[str, str] = {
     "0": "level_0",
     "1": "level_1",
     "2": "level_2",
     "3": "level_3",
 }
-VENTILATION_LEVEL_REVERSE = {v: k for k, v in VENTILATION_LEVEL_MAP.items()}
+VENTILATION_LEVEL_REVERSE: dict[str, str] = {v: k for k, v in VENTILATION_LEVEL_MAP.items()}

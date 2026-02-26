@@ -1,0 +1,88 @@
+{
+  "entity": {
+    "select": {
+      "operating_mode": {
+        "default": "mdi:hvac",
+        "state": {
+          "automatic": "mdi:hvac",
+          "manual": "mdi:hand-back-right",
+          "holiday": "mdi:palm-tree",
+          "party": "mdi:party-popper",
+          "night": "mdi:weather-night"
+        }
+      },
+      "bypass_operation": {
+        "default": "mdi:valve"
+      },
+      "ventilation_level": {
+        "default": "mdi:fan"
+      }
+    },
+    "sensor": {
+      "supply_air_flow": {
+        "default": "mdi:fan"
+      },
+      "exhaust_air_flow": {
+        "default": "mdi:fan"
+      },
+      "days_since_filter_reset": {
+        "default": "mdi:air-filter"
+      },
+      "remaining_duration": {
+        "default": "mdi:timer"
+      },
+      "active_control_status": {
+        "default": "mdi:information"
+      },
+      "bypass_valve_status": {
+        "default": "mdi:valve",
+        "state": {
+          "open": "mdi:valve-open",
+          "closed": "mdi:valve-closed",
+          "opening": "mdi:valve-open",
+          "closing": "mdi:valve-closed",
+          "init": "mdi:valve"
+        }
+      },
+      "preheater_status": {
+        "default": "mdi:radiator",
+        "state": {
+          "off": "mdi:radiator-off",
+          "auto": "mdi:radiator",
+          "lock_current": "mdi:radiator-disabled",
+          "lock_maximum": "mdi:radiator-disabled"
+        }
+      },
+      "fresh_air_temp": {
+        "default": "mdi:thermometer"
+      },
+      "supply_temp": {
+        "default": "mdi:thermometer"
+      },
+      "humidity": {
+        "default": "mdi:water-percent"
+      },
+      "co2_sensor_1": {
+        "default": "mdi:molecule-co2"
+      },
+      "co2_sensor_2": {
+        "default": "mdi:molecule-co2"
+      },
+      "co2_sensor_3": {
+        "default": "mdi:molecule-co2"
+      },
+      "co2_sensor_4": {
+        "default": "mdi:molecule-co2"
+      }
+    },
+    "binary_sensor": {
+      "filter_status": {
+        "default": "mdi:air-filter",
+        "state": {
+          "on": "mdi:air-filter-off",
+          "off": "mdi:air-filter"
+        }
+      }
+    }
+  }
+}

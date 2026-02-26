@@ -1,21 +1,22 @@
 """Select entities for Brink Home Ventilation."""
+
 from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
+
+import aiohttp
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BrinkHomeDeviceEntity, async_start_expedited_polling
+from . import BrinkConfigEntry
 from .const import (
     BYPASS_OPERATION_MAP,
     BYPASS_OPERATION_REVERSE,
-    DATA_CLIENT,
-    DATA_COORDINATOR,
     DOMAIN,
     OPERATING_MODE_MAP,
     OPERATING_MODE_REVERSE,
@@ -28,45 +29,64 @@ from .const import (
     VENTILATION_LEVEL_MAP,
     VENTILATION_LEVEL_REVERSE,
 )
+from .core.brink_home_cloud import BrinkAuthError
+from .entity import BrinkHomeDeviceEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BrinkConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Brink Home select platform."""
-    client = hass.data[DOMAIN][entry.entry_id][DATA_CLIENT]
-    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
+    known_systems: set[int] = set()
 
-    select_configs = [
+    select_configs: list[tuple[int, str, type[BrinkHomeSelectEntity]]] = [
         (PARAM_OPERATING_MODE, "mode", BrinkHomeModeSelectEntity),
         (PARAM_BYPASS_OPERATION, "bypass", BrinkHomeBypassSelectEntity),
         (PARAM_VENTILATION_LEVEL, "ventilation_level", BrinkHomeVentilationLevelSelectEntity),
     ]
 
-    entities = []
-    for device_index, device in enumerate(coordinator.data):
-        found_params = set()
-        for component in device.get("components", []):
-            params = component.get("parameters", {})
-            for param_id, entity_key, cls in select_configs:
-                if param_id in params and param_id not in found_params:
-                    entities.append(
-                        cls(client, coordinator, device_index, param_id, entity_key)
-                    )
-                    found_params.add(param_id)
+    @callback
+    def _async_add_new_devices() -> None:
+        """Detect new devices and add select entities for them."""
+        if not coordinator.data:
+            return
 
-    _LOGGER.debug("Setting up %s select entities", len(entities))
-    async_add_entities(entities)
+        new_systems = set(coordinator.data) - known_systems
+        if not new_systems:
+            return
+
+        known_systems.update(new_systems)
+        entities: list[BrinkHomeSelectEntity] = []
+
+        for system_id in new_systems:
+            device = coordinator.data[system_id]
+            found_params: set[int] = set()
+            for component in device.get("components", []):
+                params = component.get("parameters", {})
+                for param_id, entity_key, cls in select_configs:
+                    if param_id in params and param_id not in found_params:
+                        entities.append(
+                            cls(coordinator, system_id, param_id, entity_key)
+                        )
+                        found_params.add(param_id)
+
+        if entities:
+            _LOGGER.debug("Adding %s select entities", len(entities))
+            async_add_entities(entities)
+
+    _async_add_new_devices()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new_devices))
 
 
 class BrinkHomeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
     """Base class for Brink select entities with shared write-then-refresh logic."""
-
-    _attr_has_entity_name = True
 
     # Subclasses must set these
     _value_map: dict[str, str]  # value -> label
@@ -88,80 +108,98 @@ class BrinkHomeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
         """Return the list of available options."""
         return list(self._value_map.values())
 
-    def _validate_for_write(self, option: str) -> tuple[str, dict]:
-        """Validate that a write can proceed and return (api_value, param_dict).
+    def _validate_for_write(self, option: str) -> tuple[str, dict[str, Any], int]:
+        """Validate that a write can proceed and return (api_value, param_dict, gateway_id).
 
         Raises HomeAssistantError if the option is unknown, the parameter is
         unavailable, the gateway is missing, or the parameter is read-only.
         """
         value = self._reverse_map.get(option)
         if value is None:
-            raise HomeAssistantError(f"Unknown option: {option}")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_option",
+                translation_placeholders={"option": option},
+            )
 
         param = self._param
         if param is None:
             raise HomeAssistantError(
-                f"Parameter not available for {self.entity_key}. "
-                "The device may be offline."
+                translation_domain=DOMAIN,
+                translation_key="parameter_unavailable",
+                translation_placeholders={"entity_key": self._entity_key},
             )
 
-        if self._gateway_id is None:
+        gateway_id = self._gateway_id
+        if gateway_id is None:
             raise HomeAssistantError(
-                "Cannot send command: gateway not available. "
-                "The Brink Home portal may be experiencing issues."
+                translation_domain=DOMAIN,
+                translation_key="gateway_unavailable",
             )
 
         if param.get("value_id") is None:
             raise HomeAssistantError(
-                f"Cannot send command: parameter {self.entity_key} is read-only."
+                translation_domain=DOMAIN,
+                translation_key="parameter_read_only",
+                translation_placeholders={"entity_key": self._entity_key},
             )
 
-        return value, param
+        return value, param, gateway_id
 
-    async def async_select_option(self, option: str) -> None:
-        """Set the selected option."""
-        value, param = self._validate_for_write(option)
-
+    async def _write_and_refresh(
+        self, gateway_id: int, params: list[tuple[int, str]]
+    ) -> None:
+        """Write parameter(s) to the API and trigger a coordinated refresh."""
         try:
-            await self.client.write_parameter(
-                self.system_id, self._gateway_id, param["value_id"], value
+            await self.coordinator.client.write_parameters(
+                self._system_id, gateway_id, params
             )
-        except Exception as ex:
+        except HomeAssistantError:
+            raise
+        except (aiohttp.ClientError, asyncio.TimeoutError, BrinkAuthError) as ex:
             raise HomeAssistantError(
-                f"Failed to set {self.entity_key}: {ex}"
+                translation_domain=DOMAIN,
+                translation_key="write_failed",
+                translation_placeholders={
+                    "entity_key": self._entity_key,
+                    "error": str(ex),
+                },
             ) from ex
 
         await asyncio.sleep(REFRESH_DELAY)
         await self.coordinator.async_request_refresh()
-        async_start_expedited_polling(self.hass, self.coordinator)
+        self.coordinator.start_expedited_polling()
+
+    async def async_select_option(self, option: str) -> None:
+        """Set the selected option."""
+        value, param, gateway_id = self._validate_for_write(option)
+        await self._write_and_refresh(gateway_id, [(param["value_id"], value)])
 
 
 class BrinkHomeModeSelectEntity(BrinkHomeSelectEntity):
     """Representation of the Brink operating mode select."""
 
     _attr_translation_key = "operating_mode"
-    _attr_icon = "mdi:hvac"
     _value_map = OPERATING_MODE_MAP
     _reverse_map = OPERATING_MODE_REVERSE
 
     @property
     def unique_id(self) -> str:
         """Return a unique ID for this entity."""
-        return f"{DOMAIN}_{self.system_id}_mode"
+        return f"{DOMAIN}_{self._system_id}_mode"
 
 
 class BrinkHomeBypassSelectEntity(BrinkHomeSelectEntity):
     """Representation of the Brink bypass valve operation select."""
 
     _attr_translation_key = "bypass_operation"
-    _attr_icon = "mdi:valve"
     _value_map = BYPASS_OPERATION_MAP
     _reverse_map = BYPASS_OPERATION_REVERSE
 
     @property
     def unique_id(self) -> str:
         """Return a unique ID for this entity."""
-        return f"{DOMAIN}_{self.system_id}_bypass_operation"
+        return f"{DOMAIN}_{self._system_id}_bypass_operation"
 
 
 class BrinkHomeVentilationLevelSelectEntity(BrinkHomeSelectEntity):
@@ -175,17 +213,16 @@ class BrinkHomeVentilationLevelSelectEntity(BrinkHomeSelectEntity):
     """
 
     _attr_translation_key = "ventilation_level"
-    _attr_icon = "mdi:fan"
     _value_map = VENTILATION_LEVEL_MAP
     _reverse_map = VENTILATION_LEVEL_REVERSE
 
     @property
     def unique_id(self) -> str:
         """Return a unique ID for this entity."""
-        return f"{DOMAIN}_{self.system_id}_ventilation_level"
+        return f"{DOMAIN}_{self._system_id}_ventilation_level"
 
     @staticmethod
-    def _format_flow(param: dict | None) -> str | None:
+    def _format_flow(param: dict[str, Any] | None) -> str | None:
         """Return an air flow value with unit, e.g. '125 m³/h'."""
         if param is None:
             return None
@@ -199,35 +236,27 @@ class BrinkHomeVentilationLevelSelectEntity(BrinkHomeSelectEntity):
         """Return supply and exhaust air flow as extra attributes."""
         return {
             "supply_air_flow": self._format_flow(
-                self._parameters.get(PARAM_SUPPLY_AIR_FLOW)
+                self._get_param_any_component(PARAM_SUPPLY_AIR_FLOW)
             ),
             "exhaust_air_flow": self._format_flow(
-                self._parameters.get(PARAM_EXHAUST_AIR_FLOW)
+                self._get_param_any_component(PARAM_EXHAUST_AIR_FLOW)
             ),
         }
 
     async def async_select_option(self, option: str) -> None:
         """Set the ventilation level, switching to Manual mode first."""
-        value, vent_param = self._validate_for_write(option)
+        value, vent_param, gateway_id = self._validate_for_write(option)
 
         # Switch to Manual mode (1) first so the level change takes effect
-        params_to_write = []
-        mode_param = self._parameters.get(PARAM_OPERATING_MODE)
-        if mode_param is not None:
-            mode_value_id = mode_param.get("value_id")
-            if mode_value_id is not None:
-                params_to_write.append((mode_value_id, "1"))
+        params_to_write: list[tuple[int, str]] = []
+        mode_param = self._get_param_any_component(PARAM_OPERATING_MODE)
+        if mode_param is None or mode_param.get("value_id") is None:
+            _LOGGER.warning(
+                "Operating mode parameter unavailable; ventilation level "
+                "write may not take effect if device is not in Manual mode"
+            )
+        else:
+            params_to_write.append((mode_param["value_id"], "1"))
         params_to_write.append((vent_param["value_id"], value))
 
-        try:
-            await self.client.write_parameters(
-                self.system_id, self._gateway_id, params_to_write
-            )
-        except Exception as ex:
-            raise HomeAssistantError(
-                f"Failed to set ventilation level: {ex}"
-            ) from ex
-
-        await asyncio.sleep(REFRESH_DELAY)
-        await self.coordinator.async_request_refresh()
-        async_start_expedited_polling(self.hass, self.coordinator)
+        await self._write_and_refresh(gateway_id, params_to_write)

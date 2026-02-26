@@ -1,4 +1,5 @@
 """Binary sensor entity for Brink Home Ventilation."""
+
 from __future__ import annotations
 
 import logging
@@ -7,62 +8,75 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.const import EntityCategory
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BrinkHomeDeviceEntity
-from .const import (
-    DATA_CLIENT,
-    DATA_COORDINATOR,
-    DOMAIN,
-    PARAM_FILTER_STATUS,
-)
+from . import BrinkConfigEntry
+from .const import DOMAIN, PARAM_FILTER_STATUS
+from .entity import BrinkHomeDeviceEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BrinkConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Brink Home binary sensor platform."""
-    client = hass.data[DOMAIN][entry.entry_id][DATA_CLIENT]
-    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
+    known_systems: set[int] = set()
 
-    entities = []
-    for device_index, device in enumerate(coordinator.data):
-        for component in device.get("components", []):
-            params = component.get("parameters", {})
-            if PARAM_FILTER_STATUS in params:
-                entities.append(
-                    BrinkFilterStatusBinarySensor(
-                        client,
-                        coordinator,
-                        device_index,
-                        PARAM_FILTER_STATUS,
-                        "filter_status",
+    @callback
+    def _async_add_new_devices() -> None:
+        """Detect new devices and add binary sensor entities for them."""
+        if not coordinator.data:
+            return
+
+        new_systems = set(coordinator.data) - known_systems
+        if not new_systems:
+            return
+
+        known_systems.update(new_systems)
+        entities: list[BrinkFilterStatusBinarySensor] = []
+
+        for system_id in new_systems:
+            device = coordinator.data[system_id]
+            for component in device.get("components", []):
+                params = component.get("parameters", {})
+                if PARAM_FILTER_STATUS in params:
+                    entities.append(
+                        BrinkFilterStatusBinarySensor(
+                            coordinator,
+                            system_id,
+                            PARAM_FILTER_STATUS,
+                            "filter_status",
+                        )
                     )
-                )
-                break  # One filter sensor per device
+                    break  # One filter sensor per device
 
-    _LOGGER.debug("Setting up %s binary sensor entities", len(entities))
-    async_add_entities(entities)
+        if entities:
+            _LOGGER.debug("Adding %s binary sensor entities", len(entities))
+            async_add_entities(entities)
+
+    _async_add_new_devices()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new_devices))
 
 
 class BrinkFilterStatusBinarySensor(BrinkHomeDeviceEntity, BinarySensorEntity):
     """Binary sensor for Brink filter status (dirty/not dirty)."""
 
-    _attr_has_entity_name = True
     _attr_translation_key = "filter_status"
-    _attr_icon = "mdi:air-filter"
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def unique_id(self) -> str:
         """Return a unique ID for this entity."""
-        return f"{DOMAIN}_{self.system_id}_filter_status"
+        return f"{DOMAIN}_{self._system_id}_filter_status"
 
     @property
     def is_on(self) -> bool | None:

@@ -1,8 +1,10 @@
 """Sensor entities for Brink Home Ventilation."""
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -10,23 +12,21 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    PERCENTAGE,
     CONCENTRATION_PARTS_PER_MILLION,
+    PERCENTAGE,
+    EntityCategory,
     UnitOfTemperature,
     UnitOfTime,
     UnitOfVolumeFlowRate,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BrinkHomeDeviceEntity
+from . import BrinkConfigEntry
 from .const import (
     ACTIVE_CONTROL_STATUS_MAP,
     BYPASS_VALVE_STATUS_MAP,
-    DATA_CLIENT,
-    DATA_COORDINATOR,
     DOMAIN,
     PARAM_ACTIVE_CONTROL_STATUS,
     PARAM_BYPASS_VALVE_STATUS,
@@ -44,8 +44,12 @@ from .const import (
     PARAM_SUPPLY_TEMP,
     PREHEATER_STATUS_MAP,
 )
+from .coordinator import BrinkDataCoordinator
+from .entity import BrinkHomeDeviceEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 0
 
 
 @dataclass(frozen=True)
@@ -61,7 +65,6 @@ SENSOR_DESCRIPTIONS: list[BrinkSensorDescription] = [
         key="supply_air_flow",
         translation_key="supply_air_flow",
         param_id=PARAM_SUPPLY_AIR_FLOW,
-        icon="mdi:fan",
         native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
     ),
@@ -69,7 +72,6 @@ SENSOR_DESCRIPTIONS: list[BrinkSensorDescription] = [
         key="exhaust_air_flow",
         translation_key="exhaust_air_flow",
         param_id=PARAM_EXHAUST_AIR_FLOW,
-        icon="mdi:fan",
         native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
     ),
@@ -96,49 +98,52 @@ SENSOR_DESCRIPTIONS: list[BrinkSensorDescription] = [
         device_class=SensorDeviceClass.HUMIDITY,
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
     ),
     BrinkSensorDescription(
         key="days_since_filter_reset",
         translation_key="days_since_filter_reset",
         param_id=PARAM_DAYS_SINCE_FILTER_RESET,
-        icon="mdi:air-filter",
         native_unit_of_measurement=UnitOfTime.DAYS,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     BrinkSensorDescription(
         key="remaining_duration",
         translation_key="remaining_duration",
         param_id=PARAM_REMAINING_DURATION,
-        icon="mdi:timer",
         native_unit_of_measurement=UnitOfTime.MINUTES,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
     BrinkSensorDescription(
         key="active_control_status",
         translation_key="active_control_status",
         param_id=PARAM_ACTIVE_CONTROL_STATUS,
-        icon="mdi:information",
         device_class=SensorDeviceClass.ENUM,
         options=list(ACTIVE_CONTROL_STATUS_MAP.values()),
         enum_map=ACTIVE_CONTROL_STATUS_MAP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
     BrinkSensorDescription(
         key="bypass_valve_status",
         translation_key="bypass_valve_status",
         param_id=PARAM_BYPASS_VALVE_STATUS,
-        icon="mdi:valve",
         device_class=SensorDeviceClass.ENUM,
         options=list(BYPASS_VALVE_STATUS_MAP.values()),
         enum_map=BYPASS_VALVE_STATUS_MAP,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     BrinkSensorDescription(
         key="preheater_status",
         translation_key="preheater_status",
         param_id=PARAM_PREHEATER_STATUS,
-        icon="mdi:radiator",
         device_class=SensorDeviceClass.ENUM,
         options=list(PREHEATER_STATUS_MAP.values()),
         enum_map=PREHEATER_STATUS_MAP,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     BrinkSensorDescription(
         key="co2_sensor_1",
@@ -147,6 +152,7 @@ SENSOR_DESCRIPTIONS: list[BrinkSensorDescription] = [
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
     ),
     BrinkSensorDescription(
         key="co2_sensor_2",
@@ -155,6 +161,7 @@ SENSOR_DESCRIPTIONS: list[BrinkSensorDescription] = [
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
     ),
     BrinkSensorDescription(
         key="co2_sensor_3",
@@ -163,6 +170,7 @@ SENSOR_DESCRIPTIONS: list[BrinkSensorDescription] = [
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
     ),
     BrinkSensorDescription(
         key="co2_sensor_4",
@@ -171,65 +179,79 @@ SENSOR_DESCRIPTIONS: list[BrinkSensorDescription] = [
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
     ),
 ]
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BrinkConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Brink Home sensor platform."""
-    client = hass.data[DOMAIN][entry.entry_id][DATA_CLIENT]
-    coordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
+    coordinator = entry.runtime_data.coordinator
+    known_systems: set[int] = set()
 
-    entities = []
-    for device_index, device in enumerate(coordinator.data):
-        found_params = set()
-        for component in device.get("components", []):
-            params = component.get("parameters", {})
-            for desc in SENSOR_DESCRIPTIONS:
-                if desc.param_id in params and desc.param_id not in found_params:
-                    entities.append(
-                        BrinkHomeSensorEntity(
-                            client=client,
-                            coordinator=coordinator,
-                            device_index=device_index,
-                            param_id=desc.param_id,
-                            entity_key=desc.key,
-                            description=desc,
+    @callback
+    def _async_add_new_devices() -> None:
+        """Detect new devices and add sensor entities for them."""
+        if not coordinator.data:
+            return
+
+        new_systems = set(coordinator.data) - known_systems
+        if not new_systems:
+            return
+
+        known_systems.update(new_systems)
+        entities: list[BrinkHomeSensorEntity] = []
+
+        for system_id in new_systems:
+            device = coordinator.data[system_id]
+            found_params: set[int] = set()
+            for component in device.get("components", []):
+                params = component.get("parameters", {})
+                for desc in SENSOR_DESCRIPTIONS:
+                    if desc.param_id in params and desc.param_id not in found_params:
+                        entities.append(
+                            BrinkHomeSensorEntity(
+                                coordinator=coordinator,
+                                system_id=system_id,
+                                param_id=desc.param_id,
+                                entity_key=desc.key,
+                                description=desc,
+                            )
                         )
-                    )
-                    found_params.add(desc.param_id)
+                        found_params.add(desc.param_id)
 
-    _LOGGER.debug("Setting up %s sensor entities", len(entities))
-    async_add_entities(entities)
+        if entities:
+            _LOGGER.debug("Adding %s sensor entities", len(entities))
+            async_add_entities(entities)
+
+    _async_add_new_devices()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new_devices))
 
 
 class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):
     """Representation of a Brink sensor."""
 
-    _attr_has_entity_name = True
-
     def __init__(
         self,
-        client,
-        coordinator,
-        device_index: int,
+        coordinator: BrinkDataCoordinator,
+        system_id: int,
         param_id: int,
         entity_key: str,
         description: BrinkSensorDescription,
-    ):
+    ) -> None:
         """Initialize the Brink sensor."""
-        super().__init__(client, coordinator, device_index, param_id, entity_key)
+        super().__init__(coordinator, system_id, param_id, entity_key)
         self.entity_description = description
         self._enum_map = description.enum_map
 
     @property
     def unique_id(self) -> str:
         """Return a unique ID for this entity."""
-        return f"{DOMAIN}_{self.system_id}_{self.entity_description.key}"
+        return f"{DOMAIN}_{self._system_id}_{self.entity_description.key}"
 
     @property
     def native_value(self) -> str | float | None:
