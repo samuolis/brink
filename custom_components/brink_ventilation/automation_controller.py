@@ -98,6 +98,8 @@ class BrinkAutomationController:
         # Track whether automation was in BASE before boost (for correct return state)
         self._was_in_base_before_boost: bool = False
 
+        self._boost_end_monotonic: float = 0.0
+
         # Unsub handles
         self._boost_timer_unsub: CALLBACK_TYPE | None = None
         self._countdown_timer_unsub: CALLBACK_TYPE | None = None
@@ -122,12 +124,8 @@ class BrinkAutomationController:
         """Return remaining boost minutes, 0 when not boosted."""
         if self._state != AutomationState.BOOSTED:
             return 0
-        if not hasattr(self, "_boost_end_monotonic"):
-            return 0
         remaining = self._boost_end_monotonic - time.monotonic()
-        if remaining <= 0:
-            return 0
-        return int(remaining / 60) + (1 if remaining % 60 > 0 else 0)
+        return max(0, math.ceil(remaining / 60))
 
     @property
     def has_pending_writes(self) -> bool:
@@ -189,6 +187,12 @@ class BrinkAutomationController:
 
         self._start_humidity_listeners()
 
+        # Persist ha_automated active flag for startup recovery
+        self._hass.config_entries.async_update_entry(
+            self._entry,
+            options={**self._entry.options, "ha_automated_active": True},
+        )
+
         base_level = self._get_seasonal_base_level()
         params = self._build_mode_and_level_params(mode_value="1", level_value=str(base_level))
         if params:
@@ -210,7 +214,15 @@ class BrinkAutomationController:
         self._humidity_windows.clear()
         self._pending_writes = None
         self._was_in_base_before_boost = False
+        self._boost_end_monotonic = 0.0
         self._state = AutomationState.IDLE
+
+        # Clear ha_automated active flag
+        if self._entry.options.get("ha_automated_active", False):
+            self._hass.config_entries.async_update_entry(
+                self._entry,
+                options={**self._entry.options, "ha_automated_active": False},
+            )
 
     async def async_activate_extra_ventilation(self) -> None:
         """Activate extra ventilation boost (shared by button and humidity trigger).
@@ -333,6 +345,7 @@ class BrinkAutomationController:
         self._remove_humidity_listeners()
         self._humidity_windows.clear()
         self._pending_writes = None
+        self._boost_end_monotonic = 0.0
         self._state = AutomationState.IDLE
         self._season = None
 
@@ -396,10 +409,13 @@ class BrinkAutomationController:
                     mode_value="1", level_value=str(base_level)
                 )
                 if params:
-                    self._hass.async_create_task(self.async_write_params(params))
+                    self._hass.async_create_task(
+                        self._safe_write_params(params),
+                        "brink_ventilation_boost_return_to_base",
+                    )
 
-                # Resume humidity monitoring (was paused during boost)
-                self._start_humidity_listeners()
+                # Humidity monitoring resumes automatically since the _async_humidity_state_changed
+                # handler checks for BASE state — no need to restart listeners
             else:
                 _LOGGER.info(
                     "Boost timer expired, transitioning to IDLE "
@@ -533,8 +549,27 @@ class BrinkAutomationController:
                 # Clear window to prevent re-triggering immediately
                 window.clear()
                 self._hass.async_create_task(
-                    self.async_activate_extra_ventilation()
+                    self._safe_activate_extra_ventilation(),
+                    "brink_ventilation_humidity_boost",
                 )
+
+    # ------------------------------------------------------------------
+    # Safe wrappers for fire-and-forget tasks
+    # ------------------------------------------------------------------
+
+    async def _safe_write_params(self, params: list[tuple[int, str]]) -> None:
+        """Write params with error logging for fire-and-forget tasks."""
+        try:
+            await self.async_write_params(params)
+        except Exception:
+            _LOGGER.exception("Error writing params from timer callback")
+
+    async def _safe_activate_extra_ventilation(self) -> None:
+        """Activate extra ventilation with error logging for fire-and-forget tasks."""
+        try:
+            await self.async_activate_extra_ventilation()
+        except Exception:
+            _LOGGER.exception("Error activating extra ventilation from humidity spike")
 
     # ------------------------------------------------------------------
     # Season evaluation

@@ -36,7 +36,7 @@ The integration exposes up to 20 parameters from the Brink Home API as Home Assi
 | Relative humidity | % | Indoor relative humidity | Disabled |
 | Days since filter reset | days | Counter since last filter replacement | Enabled |
 | Remaining duration | minutes | Time remaining in current timed mode (Party, Night, Holiday) | Disabled |
-| Active control status | enum | Auto LAN/WLAN Portal| Disabled |
+| Active control status | enum | Current control source (Standby, Manual, Holiday, Party, Auto CO2, Auto eBus, etc.) | Disabled |
 | Bypass valve status | enum | Bypass valve state (Init, Opening, Closing, Open, Closed) | Enabled |
 | Preheater status | enum | Preheater state (Off, Auto, Lock current, Lock maximum) | Enabled |
 | CO2 sensor 1 | ppm | CO2 concentration from sensor 1 | Disabled |

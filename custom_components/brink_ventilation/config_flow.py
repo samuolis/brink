@@ -276,7 +276,7 @@ class OptionsFlowHandler(OptionsFlow):
                 CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
             ))
             if scan_interval < MIN_SCAN_INTERVAL or scan_interval > MAX_SCAN_INTERVAL:
-                errors["base"] = "scan_interval_too_low"
+                errors["base"] = "scan_interval_out_of_range"
             else:
                 self._options_data.update(user_input)
                 return await self.async_step_extra_ventilation()
