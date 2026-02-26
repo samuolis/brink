@@ -11,6 +11,45 @@ MIN_SCAN_INTERVAL = 15
 REFRESH_DELAY = 2
 EXPEDITED_DURATION = 180  # seconds (3 min) of fast polling after a write
 
+# Options flow config keys
+CONF_FREEZING_THRESHOLD = "freezing_threshold"
+CONF_TEMPERATURE_SOURCE_ENTITY = "temperature_source_entity"
+CONF_EXTRA_VENT_DURATION = "extra_vent_duration"
+CONF_EXTRA_VENT_SUMMER_LEVEL = "extra_vent_summer_level"
+CONF_EXTRA_VENT_WINTER_LEVEL = "extra_vent_winter_level"
+CONF_AUTO_SUMMER_BASE_LEVEL = "auto_summer_base_level"
+CONF_AUTO_WINTER_BASE_LEVEL = "auto_winter_base_level"
+CONF_HUMIDITY_SENSOR_1 = "humidity_sensor_1"
+CONF_HUMIDITY_SENSOR_2 = "humidity_sensor_2"
+CONF_HUMIDITY_SENSOR_3 = "humidity_sensor_3"
+CONF_HUMIDITY_SPIKE_THRESHOLD = "humidity_spike_threshold"
+
+# Defaults for new options
+DEFAULT_FREEZING_THRESHOLD = -2.0
+DEFAULT_EXTRA_VENT_DURATION = 120  # minutes
+DEFAULT_EXTRA_VENT_SUMMER_LEVEL = 3
+DEFAULT_EXTRA_VENT_WINTER_LEVEL = 2
+DEFAULT_AUTO_SUMMER_BASE_LEVEL = 2
+DEFAULT_AUTO_WINTER_BASE_LEVEL = 1
+DEFAULT_HUMIDITY_SPIKE_THRESHOLD = 5.0
+
+# Ranges
+MAX_SCAN_INTERVAL = 300
+MIN_FREEZING_THRESHOLD = -10.0
+MAX_FREEZING_THRESHOLD = 10.0
+MIN_EXTRA_VENT_DURATION = 15
+MAX_EXTRA_VENT_DURATION = 480
+MIN_HUMIDITY_SPIKE_THRESHOLD = 1.0
+MAX_HUMIDITY_SPIKE_THRESHOLD = 60.0
+
+# Humidity monitoring
+HUMIDITY_WINDOW_SECONDS = 180  # 3 minutes of rolling history
+HUMIDITY_MIN_SAMPLE_INTERVAL = 30  # seconds between samples
+
+# Season enum values
+SEASON_SUMMER = "summer"
+SEASON_WINTER = "winter"
+
 # API endpoints
 API_URL = "https://www.brink-home.com/portal/api/portal/"
 API_V1_URL = "https://www.brink-home.com/portal/api/v1.1/"
@@ -100,5 +139,6 @@ VENTILATION_LEVEL_MAP: dict[str, str] = {
     "1": "level_1",
     "2": "level_2",
     "3": "level_3",
+    "4": "ha_automated",
 }
 VENTILATION_LEVEL_REVERSE: dict[str, str] = {v: k for k, v in VENTILATION_LEVEL_MAP.items()}
