@@ -4,3 +4,4 @@ __pycache__/
 .claude*
 CLAUDE.md
 **/CLAUDE.md
+/docs
