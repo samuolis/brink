@@ -36,13 +36,16 @@ The integration exposes up to 20 parameters from the Brink Home API as Home Assi
 | Relative humidity | % | Indoor relative humidity | Disabled |
 | Days since filter reset | days | Counter since last filter replacement | Enabled |
 | Remaining duration | minutes | Time remaining in current timed mode (Party, Night, Holiday) | Disabled |
-| Active control status | enum | Current control source (Standby, Manual, Auto CO2, Auto eBus, Party, Holiday, Night ventilation, etc.) | Disabled |
+| Active control status | enum | Auto LAN/WLAN Portal| Disabled |
 | Bypass valve status | enum | Bypass valve state (Init, Opening, Closing, Open, Closed) | Enabled |
 | Preheater status | enum | Preheater state (Off, Auto, Lock current, Lock maximum) | Enabled |
 | CO2 sensor 1 | ppm | CO2 concentration from sensor 1 | Disabled |
 | CO2 sensor 2 | ppm | CO2 concentration from sensor 2 | Disabled |
 | CO2 sensor 3 | ppm | CO2 concentration from sensor 3 | Disabled |
 | CO2 sensor 4 | ppm | CO2 concentration from sensor 4 | Disabled |
+| Extra ventilation remaining | minutes | Countdown timer for active extra ventilation boost | Enabled |
+| Current season | enum | Current season (Summer/Winter) based on outdoor temperature vs freezing threshold | Enabled |
+| Humidity change (3 min) | % | Maximum humidity change across monitored sensors in the last 3 minutes. Useful for threshold tuning. | Enabled |
 
 ### Select Controls
 
@@ -50,13 +53,19 @@ The integration exposes up to 20 parameters from the Brink Home API as Home Assi
 |---|---|---|
 | Operating mode | Automatic, Manual, Holiday, Party, Night | Sets the ventilation operating mode |
 | Bypass operation | Automatic, Bypass closed, Bypass open | Controls the bypass valve for free cooling |
-| Ventilation level | Level 0, Level 1, Level 2, Level 3 | Sets the ventilation fan speed (auto-switches to Manual mode) |
+| Ventilation level | Level 0, Level 1, Level 2, Level 3, HA Automated | Sets the ventilation fan speed. HA Automated enables humidity-responsive automatic control. |
 
 ### Binary Sensors
 
 | Entity | Description |
 |---|---|
 | Filter status | Indicates whether the filter needs replacement (on = dirty) |
+
+### Button Controls
+
+| Entity | Description |
+|---|---|
+| Extra ventilation | Activates a timed ventilation boost at the seasonal max level |
 
 Entities marked "Disabled" in the Default column are created but disabled by default. Enable them in **Settings > Devices & Services > Entities** if your device has the corresponding sensor hardware (e.g., CO2 sensors, humidity sensor).
 
@@ -91,13 +100,36 @@ Entities marked "Disabled" in the Default column are created but disabled by def
 
 ### Options
 
-After setup, you can configure the polling interval:
+After setup, configure the integration options:
 
 1. Go to **Settings > Devices & Services**.
 2. Find the Brink-Home Ventilation integration and click **Configure**.
-3. Set the **Scan interval** (in seconds). Default is 60 seconds, minimum is 15 seconds.
+3. The options flow has three pages:
 
-Lower values give faster updates but increase API load. For most users, the default of 60 seconds is recommended.
+#### General Settings
+
+| Option | Default | Range | Description |
+|---|---|---|---|
+| Scan interval | 60 | 15–300 seconds | How often to poll the Brink Home API |
+| Freezing threshold | -2 | -10 to +10 °C | Temperature below which winter mode activates |
+| Temperature source | _(Brink sensor)_ | Entity selector | Optional: override with any HA temperature sensor |
+
+#### Extra Ventilation
+
+| Option | Default | Range | Description |
+|---|---|---|---|
+| Boost duration | 120 | 15–480 minutes | How long the extra ventilation boost runs |
+| Summer max level | 3 | 1–3 | Ventilation level during boost in summer |
+| Winter max level | 2 | 1–3 | Ventilation level during boost in winter (lower to save preheater electricity) |
+
+#### HA Automated Mode
+
+| Option | Default | Range | Description |
+|---|---|---|---|
+| Summer base level | 2 | 0–3 | Normal ventilation level in summer |
+| Winter base level | 1 | 0–3 | Normal ventilation level in winter |
+| Humidity sensor 1–3 | _(empty)_ | Entity selector | Up to 3 humidity sensors to monitor for spikes |
+| Humidity spike threshold | 5 | 1–60 % | Humidity increase within 3 minutes that triggers extra ventilation |
 
 ## Removal
 
@@ -105,6 +137,41 @@ Lower values give faster updates but increase API load. For most users, the defa
 2. Find **Brink-Home Ventilation**.
 3. Click the three-dot menu and select **Delete**.
 4. Restart Home Assistant (optional, but recommended to clean up fully).
+
+## Extra Ventilation
+
+The **Extra ventilation** button activates a timed ventilation boost. When pressed:
+
+1. The integration checks the current outdoor temperature against the freezing threshold.
+2. If above the threshold (summer), ventilation is set to the **summer max level**.
+3. If below the threshold (winter), ventilation is set to the **winter max level** — lower to reduce preheater electricity usage.
+4. The device is switched to Manual mode and the boost runs for the configured duration.
+5. After the timer expires, ventilation returns to the previous state.
+
+The winter/summer split exists because Brink ventilation units have a preheater that prevents freezing of the heat exchanger. At high flow rates in freezing conditions, the preheater uses significant electricity. Setting a lower max level in winter avoids this.
+
+## HA Automated Mode
+
+Select **HA Automated** in the ventilation level control to enable automatic humidity-responsive ventilation:
+
+1. The device is set to Manual mode at the seasonal **base level** (summer or winter, depending on outdoor temperature).
+2. Up to 3 humidity sensors are monitored. If any sensor detects a rapid humidity increase (configurable threshold) within 3 minutes — for example, from someone taking a shower — the **extra ventilation boost** is automatically triggered.
+3. After the boost timer expires, ventilation returns to the seasonal base level.
+4. If the outdoor temperature crosses the freezing threshold (season changes), ventilation levels are automatically adjusted.
+
+### How Humidity Spike Detection Works
+
+- The integration monitors configured humidity sensors, sampling at most every 30 seconds.
+- It maintains a 3-minute rolling window of readings per sensor.
+- If the difference between the newest and oldest reading in the window exceeds the spike threshold, extra ventilation is triggered.
+- The **Humidity change (3 min)** sensor shows the current maximum delta, which helps you fine-tune the threshold by reviewing its history.
+
+### Internet Resilience
+
+If the internet connection is lost when a ventilation level change is needed:
+
+- The command is queued and automatically retried on each polling cycle.
+- Once connectivity is restored, the queued command is sent and normal operation resumes.
 
 ## Data Update Strategy
 
@@ -134,6 +201,9 @@ This is a **cloud polling** integration. It periodically fetches data from the B
 | Session expired / re-authentication needed | Go to **Settings > Devices & Services**, find the integration, and click **Reconfigure** to enter your password again. |
 | Sensors show unexpected values | Some sensors (e.g., CO2) will report 0 if the corresponding hardware is not installed. Disable these entities if they are not relevant to your setup. |
 | Integration not found after install | Make sure you restarted Home Assistant after installing via HACS or manually. |
+| Extra ventilation not triggering from humidity | Check the "Humidity change (3 min)" sensor history to see if spikes are reaching your configured threshold. Try lowering the threshold. Ensure humidity sensors are connected and reporting values. |
+| HA Automated mode not switching levels | Verify the freezing threshold and temperature source in options. Check the "Current season" sensor to see which season is active. |
+| Commands queued but not executing | Check internet connectivity. Queued commands are retried automatically on each polling cycle. |
 
 ## Automation Examples
 
@@ -203,6 +273,24 @@ automation:
           option: "Night"
 ```
 
+### Boost ventilation with a button press
+
+```yaml
+automation:
+  - alias: "Extra ventilation from dashboard"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.extra_ventilation_trigger
+        to: "on"
+    action:
+      - service: button.press
+        target:
+          entity_id: button.brink_ventilation_XXXX_extra_ventilation
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.extra_ventilation_trigger
+```
+
 Replace `XXXX` in entity IDs with your device's system ID. You can find the correct entity IDs in **Settings > Devices & Services > Entities**.
 
 ## Use Cases
@@ -213,3 +301,5 @@ Replace `XXXX` in entity IDs with your device's system ID. You can find the corr
 - **Schedule ventilation modes**: Automatically switch to Night mode at bedtime and back to Automatic in the morning.
 - **Party and event ventilation**: Boost airflow during gatherings and return to normal afterward.
 - **Energy-aware ventilation**: Monitor supply and exhaust temperatures to understand heat recovery efficiency, and use bypass control for free cooling on mild days.
+- **Humidity-responsive ventilation**: Automatically boost ventilation when bathroom humidity spikes from showers, and return to normal when done.
+- **Season-aware energy savings**: Reduce ventilation levels in winter to minimize preheater electricity usage while maintaining comfort.
