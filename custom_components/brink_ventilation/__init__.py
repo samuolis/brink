@@ -22,6 +22,7 @@ from .core.brink_home_cloud import BrinkAuthError, BrinkHomeCloud
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
     Platform.SELECT,
     Platform.SENSOR,
 ]
