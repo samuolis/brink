@@ -23,10 +23,51 @@
   "options": {
     "step": {
       "init": {
-        "title": "Brink Home Integration konfigurieren",
-        "description": "Legen Sie fest, wie oft die Brink Home API abgefragt werden soll. Minimum sind 15 Sekunden.",
+        "title": "Allgemeine Einstellungen",
+        "description": "Allgemeine Integrationseinstellungen konfigurieren.",
         "data": {
-          "scan_interval": "Abfrageintervall (Sekunden)"
+          "scan_interval": "Abfrageintervall",
+          "freezing_threshold": "Frostgrenze",
+          "temperature_source_entity": "Temperaturquelle"
+        },
+        "data_description": {
+          "scan_interval": "Wie oft (in Sekunden) die Brink Home API nach Updates abgefragt wird.",
+          "freezing_threshold": "Temperatur (\u00b0C), unterhalb derer der Wintermodus aktiviert wird. Beeinflusst L\u00fcftungsstufen zur Reduzierung des Vorheizer-Stromverbrauchs.",
+          "temperature_source_entity": "Optional: W\u00e4hlen Sie einen Temperatursensor. Wenn leer, wird der Au\u00dfenluft-Temperatursensor des Brink-Ger\u00e4ts verwendet."
+        }
+      },
+      "extra_ventilation": {
+        "title": "Zus\u00e4tzl\u00fcftung",
+        "description": "Zusatzl\u00fcftungs-Boost konfigurieren.",
+        "data": {
+          "extra_vent_duration": "Boost-Dauer",
+          "extra_vent_summer_level": "Sommer-Maximalstufe",
+          "extra_vent_winter_level": "Winter-Maximalstufe"
+        },
+        "data_description": {
+          "extra_vent_duration": "Wie lange (in Minuten) der Zusatzl\u00fcftungs-Boost l\u00e4uft.",
+          "extra_vent_summer_level": "L\u00fcftungsstufe w\u00e4hrend des Boosts, wenn die Au\u00dfentemperatur \u00fcber der Frostgrenze liegt.",
+          "extra_vent_winter_level": "L\u00fcftungsstufe w\u00e4hrend des Boosts, wenn die Au\u00dfentemperatur unter der Frostgrenze liegt. Niedrigere Stufen reduzieren den Vorheizer-Stromverbrauch."
+        }
+      },
+      "ha_automated": {
+        "title": "HA Automatik-Modus",
+        "description": "Automatische L\u00fcftungssteuerung basierend auf Feuchtigkeitssensoren konfigurieren.",
+        "data": {
+          "auto_summer_base_level": "Sommer-Basisstufe",
+          "auto_winter_base_level": "Winter-Basisstufe",
+          "humidity_sensor_1": "Feuchtigkeitssensor 1",
+          "humidity_sensor_2": "Feuchtigkeitssensor 2",
+          "humidity_sensor_3": "Feuchtigkeitssensor 3",
+          "humidity_spike_threshold": "Feuchtigkeitsanstieg-Schwellenwert"
+        },
+        "data_description": {
+          "auto_summer_base_level": "Normale L\u00fcftungsstufe im Sommer (\u00fcber der Frostgrenze).",
+          "auto_winter_base_level": "Normale L\u00fcftungsstufe im Winter (unter der Frostgrenze).",
+          "humidity_sensor_1": "Optional: Erster Feuchtigkeitssensor zur \u00dcberwachung von Anstiegen (z.B. Badezimmer).",
+          "humidity_sensor_2": "Optional: Zweiter Feuchtigkeitssensor zur \u00dcberwachung.",
+          "humidity_sensor_3": "Optional: Dritter Feuchtigkeitssensor zur \u00dcberwachung.",
+          "humidity_spike_threshold": "Feuchtigkeitsanstieg (%) innerhalb von 3 Minuten, der den Zusatzl\u00fcftungs-Boost ausl\u00f6st."
         }
       }
     },
@@ -60,7 +101,8 @@
           "level_0": "Stufe 0",
           "level_1": "Stufe 1",
           "level_2": "Stufe 2",
-          "level_3": "Stufe 3"
+          "level_3": "Stufe 3",
+          "ha_automated": "HA Automatisch"
         }
       }
     },
@@ -136,12 +178,56 @@
       },
       "co2_sensor_4": {
         "name": "CO2-Sensor 4"
+      },
+      "extra_ventilation_remaining": {
+        "name": "Zusatzl\u00fcftung verbleibend"
+      },
+      "current_season": {
+        "name": "Aktuelle Jahreszeit",
+        "state": {
+          "summer": "Sommer",
+          "winter": "Winter"
+        }
+      }
+    },
+    "button": {
+      "extra_ventilation": {
+        "name": "Zusatzl\u00fcftung"
       }
     },
     "binary_sensor": {
       "filter_status": {
         "name": "Filterstatus"
       }
+    }
+  },
+  "exceptions": {
+    "unknown_option": {
+      "message": "Unbekannte Option: {option}"
+    },
+    "parameter_unavailable": {
+      "message": "Parameter nicht verf\u00fcgbar f\u00fcr {entity_key}. Das Ger\u00e4t ist m\u00f6glicherweise offline."
+    },
+    "gateway_unavailable": {
+      "message": "Befehl kann nicht gesendet werden: Gateway nicht verf\u00fcgbar. Das Brink Home Portal hat m\u00f6glicherweise Probleme."
+    },
+    "parameter_read_only": {
+      "message": "Befehl kann nicht gesendet werden: Parameter {entity_key} ist schreibgesch\u00fctzt."
+    },
+    "write_failed": {
+      "message": "Fehler beim Setzen von {entity_key}: {error}"
+    },
+    "boost_failed": {
+      "message": "Fehler beim Aktivieren der Zusatzl\u00fcftung: {error}"
+    },
+    "write_queued": {
+      "message": "Befehl in Warteschlange \u2014 wird erneut versucht, wenn die Verbindung wiederhergestellt ist."
+    }
+  },
+  "issues": {
+    "gateway_not_available": {
+      "title": "Gateway nicht verf\u00fcgbar f\u00fcr {device_name}",
+      "description": "Das Gateway f\u00fcr Ihr Brink-L\u00fcftungsger\u00e4t \"{device_name}\" ist nicht erreichbar. Schreibbefehle (\u00c4ndern von Modus, L\u00fcftungsstufe, Bypass) funktionieren nicht, bis das Gateway wieder online ist. \u00dcberpr\u00fcfen Sie, ob Ihr Brink-Ger\u00e4t eingeschaltet und mit dem Internet verbunden ist."
     }
   }
 }

@@ -50,13 +50,51 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configure Brink Home integration",
-        "description": "Set how often to poll the Brink Home API for updates. Minimum is 15 seconds.",
+        "title": "General Settings",
+        "description": "Configure general integration settings.",
         "data": {
-          "scan_interval": "Scan interval"
+          "scan_interval": "Scan interval",
+          "freezing_threshold": "Freezing threshold",
+          "temperature_source_entity": "Temperature source"
         },
         "data_description": {
-          "scan_interval": "How often (in seconds) to poll the Brink Home API for updates. Lower values increase responsiveness but also API load."
+          "scan_interval": "How often (in seconds) to poll the Brink Home API for updates.",
+          "freezing_threshold": "Temperature (\u00b0C) below which winter mode activates. Affects ventilation levels to reduce preheater electricity usage.",
+          "temperature_source_entity": "Optional: select a temperature sensor entity. If empty, the Brink unit's fresh air temperature sensor is used."
+        }
+      },
+      "extra_ventilation": {
+        "title": "Extra Ventilation",
+        "description": "Configure the extra ventilation boost feature.",
+        "data": {
+          "extra_vent_duration": "Boost duration",
+          "extra_vent_summer_level": "Summer max level",
+          "extra_vent_winter_level": "Winter max level"
+        },
+        "data_description": {
+          "extra_vent_duration": "How long (in minutes) the extra ventilation boost runs.",
+          "extra_vent_summer_level": "Ventilation level during boost when outdoor temperature is above the freezing threshold.",
+          "extra_vent_winter_level": "Ventilation level during boost when outdoor temperature is below the freezing threshold. Lower levels reduce preheater electricity usage."
+        }
+      },
+      "ha_automated": {
+        "title": "HA Automated Mode",
+        "description": "Configure automatic ventilation control based on humidity sensors.",
+        "data": {
+          "auto_summer_base_level": "Summer base level",
+          "auto_winter_base_level": "Winter base level",
+          "humidity_sensor_1": "Humidity sensor 1",
+          "humidity_sensor_2": "Humidity sensor 2",
+          "humidity_sensor_3": "Humidity sensor 3",
+          "humidity_spike_threshold": "Humidity spike threshold"
+        },
+        "data_description": {
+          "auto_summer_base_level": "Normal ventilation level in summer (above freezing threshold).",
+          "auto_winter_base_level": "Normal ventilation level in winter (below freezing threshold).",
+          "humidity_sensor_1": "Optional: first humidity sensor to monitor for spikes (e.g., bathroom).",
+          "humidity_sensor_2": "Optional: second humidity sensor to monitor.",
+          "humidity_sensor_3": "Optional: third humidity sensor to monitor.",
+          "humidity_spike_threshold": "Humidity increase (%) within 3 minutes that triggers extra ventilation boost."
         }
       }
     },
@@ -90,7 +128,8 @@
           "level_0": "Level 0",
           "level_1": "Level 1",
           "level_2": "Level 2",
-          "level_3": "Level 3"
+          "level_3": "Level 3",
+          "ha_automated": "HA Automated"
         }
       }
     },
@@ -166,6 +205,21 @@
       },
       "co2_sensor_4": {
         "name": "CO2 sensor 4"
+      },
+      "extra_ventilation_remaining": {
+        "name": "Extra ventilation remaining"
+      },
+      "current_season": {
+        "name": "Current season",
+        "state": {
+          "summer": "Summer",
+          "winter": "Winter"
+        }
+      }
+    },
+    "button": {
+      "extra_ventilation": {
+        "name": "Extra ventilation"
       }
     },
     "binary_sensor": {
@@ -189,6 +243,12 @@
     },
     "write_failed": {
       "message": "Failed to set {entity_key}: {error}"
+    },
+    "boost_failed": {
+      "message": "Failed to activate extra ventilation: {error}"
+    },
+    "write_queued": {
+      "message": "Command queued \u2014 will retry when connection is restored."
     }
   },
   "issues": {
