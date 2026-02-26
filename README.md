@@ -32,3 +32,14 @@ You have two options for installation:
 - Brink Renovent 400 Plus
 - Brink Flair 325
 - Please tell me, it should work with all Brink ventilation systems
+
+## What's New in 2.0.0
+
+- **v1.1 API migration** — Switched from old portal API (5 parameters, cookie auth) to v1.1 API (20+ parameters, OIDC Bearer auth with PKCE)
+- **New sensors** — Supply/exhaust air flow, fresh air/supply temperatures, humidity, CO2 (4 sensors), days since filter reset, remaining duration, active control status, bypass valve status, preheater status
+- **Ventilation level select** — Level control moved from fan entity to a select dropdown (Level 0-3), auto-switches to Manual mode
+- **New select entities** — Operating mode (Auto/Manual/Holiday/Party/Night), bypass operation
+- **Filter status** — Binary sensor for filter change indication
+- **Live config updates** — Configurable polling interval (minimum 15s) applies immediately without restart
+- **Error handling** — User-visible notifications for API and connection errors
+- **Security hardened** — OIDC PKCE with state validation, trusted-domain redirect enforcement, credential cleanup on unload, input sanitization

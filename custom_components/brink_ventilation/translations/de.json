@@ -1,0 +1,147 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Brink Home Ventilation",
+        "description": "Bitte melden Sie sich mit Ihrem Brink Home Portal-Konto an.",
+        "data": {
+          "username": "E-Mail",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen. Versuchen Sie es sp\u00e4ter erneut.",
+      "invalid_auth": "E-Mail oder Passwort ist falsch.",
+      "unknown": "Unbekannter Fehler."
+    },
+    "abort": {
+      "already_configured": "Konto ist bereits konfiguriert.",
+      "reauth_successful": "Erneute Authentifizierung war erfolgreich."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Brink Home Integration konfigurieren",
+        "description": "Legen Sie fest, wie oft die Brink Home API abgefragt werden soll. Minimum sind 15 Sekunden.",
+        "data": {
+          "scan_interval": "Abfrageintervall (Sekunden)"
+        }
+      }
+    },
+    "error": {
+      "scan_interval_too_low": "Das Abfrageintervall muss mindestens 15 Sekunden betragen."
+    }
+  },
+  "entity": {
+    "select": {
+      "operating_mode": {
+        "name": "Betriebsmodus",
+        "state": {
+          "automatic": "Automatisch",
+          "manual": "Manuell",
+          "holiday": "Urlaub",
+          "party": "Party",
+          "night": "Nacht"
+        }
+      },
+      "bypass_operation": {
+        "name": "Bypass-Betrieb",
+        "state": {
+          "automatic": "Automatisch",
+          "bypass_closed": "Bypass geschlossen",
+          "bypass_open": "Bypass offen"
+        }
+      },
+      "ventilation_level": {
+        "name": "L\u00fcftungsstufe",
+        "state": {
+          "level_0": "Stufe 0",
+          "level_1": "Stufe 1",
+          "level_2": "Stufe 2",
+          "level_3": "Stufe 3"
+        }
+      }
+    },
+    "sensor": {
+      "supply_air_flow": {
+        "name": "Zuluft-Volumenstrom"
+      },
+      "exhaust_air_flow": {
+        "name": "Abluft-Volumenstrom"
+      },
+      "fresh_air_temp": {
+        "name": "Au\u00dfenlufttemperatur"
+      },
+      "supply_temp": {
+        "name": "Zulufttemperatur"
+      },
+      "humidity": {
+        "name": "Relative Luftfeuchtigkeit"
+      },
+      "days_since_filter_reset": {
+        "name": "Tage seit Filterreset"
+      },
+      "remaining_duration": {
+        "name": "Verbleibende Dauer"
+      },
+      "active_control_status": {
+        "name": "Aktiver Regelungsstatus",
+        "state": {
+          "standby": "Standby",
+          "bootloader": "Bootloader",
+          "non_blocking_error": "Nicht blockierender Fehler",
+          "blocking_error": "Blockierender Fehler",
+          "manual": "Manuell",
+          "holiday": "Urlaub",
+          "night_ventilation": "Nachtl\u00fcftung",
+          "party": "Party",
+          "bypass_boost": "Bypass-Boost",
+          "normal_boost": "Normaler Boost",
+          "auto_co2": "Auto CO2",
+          "auto_ebus": "Auto eBus",
+          "auto_modbus": "Auto Modbus",
+          "auto_lan_wlan_portal": "Auto LAN/WLAN Portal",
+          "auto_lan_wlan_local": "Auto LAN/WLAN Lokal"
+        }
+      },
+      "bypass_valve_status": {
+        "name": "Bypass-Ventilstatus",
+        "state": {
+          "init": "Initialisierung",
+          "opening": "\u00d6ffnet",
+          "closing": "Schlie\u00dft",
+          "open": "Offen",
+          "closed": "Geschlossen"
+        }
+      },
+      "preheater_status": {
+        "name": "Vorheizer-Status",
+        "state": {
+          "off": "Aus",
+          "auto": "Automatisch",
+          "lock_current": "Sperre aktuell",
+          "lock_maximum": "Sperre maximal"
+        }
+      },
+      "co2_sensor_1": {
+        "name": "CO2-Sensor 1"
+      },
+      "co2_sensor_2": {
+        "name": "CO2-Sensor 2"
+      },
+      "co2_sensor_3": {
+        "name": "CO2-Sensor 3"
+      },
+      "co2_sensor_4": {
+        "name": "CO2-Sensor 4"
+      }
+    },
+    "binary_sensor": {
+      "filter_status": {
+        "name": "Filterstatus"
+      }
+    }
+  }
+}

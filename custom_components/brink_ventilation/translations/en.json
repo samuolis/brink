@@ -14,16 +14,133 @@
       "cannot_connect": "Can't connect. Try again later.",
       "invalid_auth": "Email or password is incorrect.",
       "unknown": "Unknown error."
+    },
+    "abort": {
+      "already_configured": "Account is already configured.",
+      "reauth_successful": "Re-authentication was successful."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Configure Brink Home integration",
-        "description": "Update the scan interval to poll for data more often.",
+        "description": "Set how often to poll the Brink Home API for updates. Minimum is 15 seconds.",
         "data": {
-          "scan_interval": "Scan Interval (seconds)"
+          "scan_interval": "Scan interval (seconds)"
         }
+      }
+    },
+    "error": {
+      "scan_interval_too_low": "Scan interval must be at least 15 seconds."
+    }
+  },
+  "entity": {
+    "select": {
+      "operating_mode": {
+        "name": "Operating mode",
+        "state": {
+          "automatic": "Automatic",
+          "manual": "Manual",
+          "holiday": "Holiday",
+          "party": "Party",
+          "night": "Night"
+        }
+      },
+      "bypass_operation": {
+        "name": "Bypass operation",
+        "state": {
+          "automatic": "Automatic",
+          "bypass_closed": "Bypass closed",
+          "bypass_open": "Bypass open"
+        }
+      },
+      "ventilation_level": {
+        "name": "Ventilation level",
+        "state": {
+          "level_0": "Level 0",
+          "level_1": "Level 1",
+          "level_2": "Level 2",
+          "level_3": "Level 3"
+        }
+      }
+    },
+    "sensor": {
+      "supply_air_flow": {
+        "name": "Supply air flow rate"
+      },
+      "exhaust_air_flow": {
+        "name": "Exhaust air flow rate"
+      },
+      "fresh_air_temp": {
+        "name": "Fresh air temperature"
+      },
+      "supply_temp": {
+        "name": "Supply temperature"
+      },
+      "humidity": {
+        "name": "Relative humidity"
+      },
+      "days_since_filter_reset": {
+        "name": "Days since filter reset"
+      },
+      "remaining_duration": {
+        "name": "Remaining duration"
+      },
+      "active_control_status": {
+        "name": "Active control status",
+        "state": {
+          "standby": "Standby",
+          "bootloader": "Bootloader",
+          "non_blocking_error": "Non-blocking error",
+          "blocking_error": "Blocking error",
+          "manual": "Manual",
+          "holiday": "Holiday",
+          "night_ventilation": "Night ventilation",
+          "party": "Party",
+          "bypass_boost": "Bypass boost",
+          "normal_boost": "Normal boost",
+          "auto_co2": "Auto CO2",
+          "auto_ebus": "Auto eBus",
+          "auto_modbus": "Auto Modbus",
+          "auto_lan_wlan_portal": "Auto LAN/WLAN Portal",
+          "auto_lan_wlan_local": "Auto LAN/WLAN Local"
+        }
+      },
+      "bypass_valve_status": {
+        "name": "Bypass valve status",
+        "state": {
+          "init": "Init",
+          "opening": "Opening",
+          "closing": "Closing",
+          "open": "Open",
+          "closed": "Closed"
+        }
+      },
+      "preheater_status": {
+        "name": "Preheater status",
+        "state": {
+          "off": "Off",
+          "auto": "Auto",
+          "lock_current": "Lock current",
+          "lock_maximum": "Lock maximum"
+        }
+      },
+      "co2_sensor_1": {
+        "name": "CO2 sensor 1"
+      },
+      "co2_sensor_2": {
+        "name": "CO2 sensor 2"
+      },
+      "co2_sensor_3": {
+        "name": "CO2 sensor 3"
+      },
+      "co2_sensor_4": {
+        "name": "CO2 sensor 4"
+      }
+    },
+    "binary_sensor": {
+      "filter_status": {
+        "name": "Filter status"
       }
     }
   }
