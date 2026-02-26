@@ -26,6 +26,7 @@ from .const import (
     EXPEDITED_DURATION,
     MIN_SCAN_INTERVAL,
 )
+from .automation_controller import BrinkAutomationController
 from .core.brink_home_cloud import BrinkAuthError, BrinkHomeCloud
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,18 +63,19 @@ class BrinkDataCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
         self._expedited_unsub: CALLBACK_TYPE | None = None
         self._expedited_normal_interval: timedelta | None = None
         self._gateway_issue_active: dict[int, bool] = {}
+        self.automation_controller = BrinkAutomationController(hass, self, entry)
 
     async def _async_update_data(self) -> dict[int, dict[str, Any]]:
         """Fetch data from Brink Home API."""
         try:
-            return await self._fetch_devices()
+            data = await self._fetch_devices()
         except BrinkAuthError as ex:
             raise ConfigEntryAuthFailed(f"Authentication failed: {ex}") from ex
         except aiohttp.ClientResponseError as ex:
             if ex.status == 401:
                 try:
                     await self.client.login()
-                    return await self._fetch_devices()
+                    data = await self._fetch_devices()
                 except BrinkAuthError as retry_ex:
                     raise ConfigEntryAuthFailed(
                         f"Re-authentication failed: {retry_ex}"
@@ -90,11 +92,16 @@ class BrinkDataCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
                     raise UpdateFailed(
                         f"Connection lost during re-auth: {retry_ex}"
                     ) from retry_ex
-            raise UpdateFailed(
-                f"API error (HTTP {ex.status}): {ex.message}"
-            ) from ex
+            else:
+                raise UpdateFailed(
+                    f"API error (HTTP {ex.status}): {ex.message}"
+                ) from ex
         except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
             raise UpdateFailed(f"Connection error: {ex}") from ex
+
+        # Notify automation controller of fresh data
+        await self.automation_controller.async_on_coordinator_update()
+        return data
 
     async def _fetch_devices(self) -> dict[int, dict[str, Any]]:
         """Fetch all systems and their parameters."""
