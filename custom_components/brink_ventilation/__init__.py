@@ -64,6 +64,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: BrinkConfigEntry) -> boo
     coordinator = BrinkDataCoordinator(hass, brink_client, entry)
     await coordinator.async_config_entry_first_refresh()
 
+    # Restore HA automated mode if it was active before restart
+    await coordinator.automation_controller.async_restore_state()
+
     entry.runtime_data = BrinkRuntimeData(
         client=brink_client,
         coordinator=coordinator,
@@ -87,6 +90,7 @@ async def _async_update_listener(
         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
     ))
     await coordinator.async_update_scan_interval(new_interval)
+    await coordinator.automation_controller.async_options_updated()
 
 
 async def async_unload_entry(
@@ -96,6 +100,7 @@ async def async_unload_entry(
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         coordinator = entry.runtime_data.coordinator
+        await coordinator.automation_controller.async_cleanup()
         coordinator.cancel_expedited_polling()
         await entry.runtime_data.client.close()
 
