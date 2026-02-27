@@ -139,6 +139,7 @@ After setup, configure the integration options:
 2. Find **Brink-Home Ventilation**.
 3. Click the three-dot menu and select **Delete**.
 4. Restart Home Assistant (optional, but recommended to clean up fully).
+5. To also remove the integration files, open **HACS > Integrations**, find "Brink-Home Ventilation", click the three-dot menu, and select **Remove**. Then restart Home Assistant again.
 
 ## Extra Ventilation
 
@@ -183,6 +184,7 @@ This is a **cloud polling** integration. It periodically fetches data from the B
 - **Expedited polling**: After a write command (changing mode, ventilation level, or bypass), the polling interval is temporarily reduced to 15 seconds for 3 minutes so that changes are reflected quickly.
 - **Authentication**: Uses OIDC with PKCE (OAuth 2.0) for secure authentication with the Brink Home portal.
 - **Coordinator pattern**: Uses Home Assistant's `DataUpdateCoordinator` so all entities share a single polling cycle, minimizing API calls.
+- **No local network access required**: All communication goes through the Brink Home cloud. The integration does not connect to your ventilation unit directly over your local network.
 
 ## Known Limitations
 
@@ -191,6 +193,8 @@ This is a **cloud polling** integration. It periodically fetches data from the B
 - **Optional sensors disabled by default**: Sensors for CO2, humidity, remaining duration, and active control status are disabled by default. Enable them in entity settings if your device has the corresponding hardware.
 - **Polling-based updates**: Changes made outside Home Assistant (e.g., via the Brink Home app or physical controls) may take up to one polling interval to appear.
 - **Old portal API for writes**: Write commands use the legacy portal API due to Brink API limitations. Read operations use the newer v1.1 API.
+- **Single account per instance**: Only one Brink Home account can be configured per integration instance. If you have multiple accounts, you would need multiple integration entries.
+- **Adaptive (HA) mode requires external sensors**: Humidity spike detection in Adaptive mode requires external humidity sensors configured in Home Assistant. The built-in Brink humidity sensor alone is not sufficient for spike detection because it is only polled at the integration's scan interval.
 
 ## Troubleshooting
 
@@ -257,6 +261,21 @@ automation:
           entity_id: select.brink_ventilation_XXXX_ventilation_level
         data:
           option: "Level 3"
+```
+
+### Boost ventilation when bathroom humidity is high
+
+```yaml
+automation:
+  - alias: "Boost ventilation on high humidity"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.bathroom_humidity
+        above: 70
+    action:
+      - service: switch.turn_on
+        target:
+          entity_id: switch.brink_ventilation_XXXX_extra_ventilation
 ```
 
 ### Night mode on a schedule

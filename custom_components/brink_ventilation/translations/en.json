@@ -86,7 +86,7 @@
           "humidity_sensor_1": "Humidity sensor 1",
           "humidity_sensor_2": "Humidity sensor 2",
           "humidity_sensor_3": "Humidity sensor 3",
-          "humidity_spike_threshold": "Humidity spike threshold"
+          "humidity_spike_threshold": "Humidity spike rate threshold"
         },
         "data_description": {
           "auto_summer_base_level": "Normal ventilation level in summer (above freezing threshold).",
@@ -94,7 +94,7 @@
           "humidity_sensor_1": "Optional: first humidity sensor to monitor for spikes (e.g., bathroom).",
           "humidity_sensor_2": "Optional: second humidity sensor to monitor.",
           "humidity_sensor_3": "Optional: third humidity sensor to monitor.",
-          "humidity_spike_threshold": "Humidity increase (%) within 3 minutes that triggers extra ventilation boost."
+          "humidity_spike_threshold": "Humidity rate of change (%/min) that triggers extra ventilation boost."
         }
       }
     },
@@ -219,13 +219,13 @@
         }
       },
       "humidity_delta_1": {
-        "name": "Humidity change sensor 1 (3 min)"
+        "name": "Humidity rate sensor 1 (%/min)"
       },
       "humidity_delta_2": {
-        "name": "Humidity change sensor 2 (3 min)"
+        "name": "Humidity rate sensor 2 (%/min)"
       },
       "humidity_delta_3": {
-        "name": "Humidity change sensor 3 (3 min)"
+        "name": "Humidity rate sensor 3 (%/min)"
       }
     },
     "switch": {

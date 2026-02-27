@@ -10,10 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers.aiohttp_client import (
-    async_create_clientsession,
-    async_get_clientsession,
-)
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry
 
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
@@ -45,24 +42,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: BrinkConfigEntry) -> boo
     password: str = entry.data[CONF_PASSWORD]
 
     session = async_get_clientsession(hass)
-    old_session = async_create_clientsession(
-        hass, cookie_jar=aiohttp.CookieJar(unsafe=False)
-    )
-    brink_client = BrinkHomeCloud(session, old_session, username, password)
+    brink_client = BrinkHomeCloud(session, username, password)
 
     try:
         await brink_client.login()
     except BrinkAuthError as ex:
+        await brink_client.close()
         raise ConfigEntryAuthFailed from ex
     except aiohttp.ClientResponseError as ex:
+        await brink_client.close()
         if ex.status == 401:
             raise ConfigEntryAuthFailed from ex
         raise ConfigEntryNotReady from ex
     except (aiohttp.ClientError, TimeoutError) as ex:
+        await brink_client.close()
         raise ConfigEntryNotReady from ex
 
-    coordinator = BrinkDataCoordinator(hass, brink_client, entry)
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        coordinator = BrinkDataCoordinator(hass, brink_client, entry)
+        await coordinator.async_config_entry_first_refresh()
+    except Exception:
+        await brink_client.close()
+        raise
 
     # Restore Adaptive (HA) mode if it was active before restart
     await coordinator.automation_controller.async_restore_state()

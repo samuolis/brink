@@ -9,8 +9,18 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 
 from . import BrinkConfigEntry
+from .const import (
+    CONF_HUMIDITY_SENSOR_1,
+    CONF_HUMIDITY_SENSOR_2,
+    CONF_HUMIDITY_SENSOR_3,
+    CONF_TEMPERATURE_SOURCE_ENTITY,
+)
 
-TO_REDACT = {CONF_USERNAME, CONF_PASSWORD, "serial_number", "system_id", "gateway_id"}
+TO_REDACT = {
+    CONF_USERNAME, CONF_PASSWORD, "serial_number", "system_id", "gateway_id",
+    CONF_HUMIDITY_SENSOR_1, CONF_HUMIDITY_SENSOR_2, CONF_HUMIDITY_SENSOR_3,
+    CONF_TEMPERATURE_SOURCE_ENTITY,
+}
 
 
 async def async_get_config_entry_diagnostics(
@@ -34,7 +44,7 @@ async def async_get_config_entry_diagnostics(
     }
     return {
         "entry_data": async_redact_data(dict(entry.data), TO_REDACT),
-        "entry_options": dict(entry.options),
+        "entry_options": async_redact_data(dict(entry.options), TO_REDACT),
         "devices": devices_redacted,
         "automation_controller": controller_diagnostics,
     }

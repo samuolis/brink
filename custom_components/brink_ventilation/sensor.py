@@ -376,14 +376,14 @@ _HUMIDITY_CONF_KEYS = {
 
 
 class BrinkHumidityDeltaEntity(BrinkHomeDeviceEntity, SensorEntity):
-    """Sensor showing the humidity change for a specific monitored sensor.
+    """Sensor showing the humidity rate of change (%/min) for a monitored sensor.
 
     Always created for slots 1-3. Dynamically reads the assigned source
     sensor from options so no restart is needed when sensors change.
     Shows unavailable when no sensor is assigned to this slot.
     """
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = "%/min"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 

@@ -102,7 +102,6 @@ class BrinkHomeCloud:
     def __init__(
         self,
         session: aiohttp.ClientSession,
-        old_session: aiohttp.ClientSession,
         username: str,
         password: str,
     ) -> None:
@@ -110,12 +109,13 @@ class BrinkHomeCloud:
 
         Args:
             session: HA shared session (no cookies) for v1.1 API.
-            old_session: HA-managed session with CookieJar for old portal API.
             username: Brink Home portal username.
             password: Brink Home portal password.
         """
         self._session = session
-        self._old_session = old_session
+        self._old_session = aiohttp.ClientSession(
+            cookie_jar=aiohttp.CookieJar(unsafe=False)
+        )
         self._username = username
         self._password = password
 
@@ -139,15 +139,14 @@ class BrinkHomeCloud:
         await self._old_api_login()
 
     async def close(self) -> None:
-        """Clear sensitive state. Call on integration unload.
-
-        Sessions are HA-managed and will be closed by HA automatically.
-        """
+        """Clear sensitive state and close owned session. Call on integration unload."""
         self._access_token = None
         self._token_expiry = 0.0
         self._old_api_authenticated = False
         self._username = ""
         self._password = ""
+        if not self._old_session.closed:
+            await self._old_session.close()
 
     async def get_systems(self) -> list[dict[str, Any]]:
         """Get list of systems by combining v1.1 API (info) and old API (gateway_id)."""
@@ -221,10 +220,20 @@ class BrinkHomeCloud:
                             url,
                             headers=_OLD_API_HEADERS,
                         )
-                resp.raise_for_status()
-                data = await resp.json()
+                try:
+                    resp.raise_for_status()
+                    data = await resp.json()
+                finally:
+                    await resp.release()
+        except BrinkAuthError:
+            _LOGGER.warning("Re-authentication failed fetching gateway map, using cache")
+            return {}
         except (aiohttp.ClientError, asyncio.TimeoutError):
             _LOGGER.warning("Could not fetch gateway map from old API")
+            return {}
+
+        if not isinstance(data, list):
+            _LOGGER.warning("Unexpected response format from GetSystemList: %s", type(data).__name__)
             return {}
 
         gateway_map: dict[int, int] = {}

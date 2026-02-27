@@ -7,6 +7,7 @@ write queue that retries failed API writes on the next coordinator refresh.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 import time
@@ -21,6 +22,7 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
 )
 
+from .core.brink_home_cloud import BrinkAuthError
 from .const import (
     CONF_AUTO_SUMMER_BASE_LEVEL,
     CONF_AUTO_WINTER_BASE_LEVEL,
@@ -100,6 +102,9 @@ class BrinkAutomationController:
 
         self._boost_end_monotonic: float = 0.0
 
+        self._boost_pending: bool = False
+        self._pending_task: asyncio.Task[None] | None = None
+
         # Unsub handles
         self._boost_timer_unsub: CALLBACK_TYPE | None = None
         self._countdown_timer_unsub: CALLBACK_TYPE | None = None
@@ -145,25 +150,32 @@ class BrinkAutomationController:
 
     @property
     def humidity_deltas(self) -> dict[str, float]:
-        """Return current humidity delta (newest - oldest) for each monitored sensor.
+        """Return current humidity rate of change (%/min) for each monitored sensor.
 
-        Returns a dict of entity_id -> delta value. Delta is 0.0 if window
-        has fewer than 2 readings.
+        Returns a dict of entity_id -> rate value. Rate is 0.0 if window
+        has fewer than 2 readings or elapsed time is too short.
         """
         deltas: dict[str, float] = {}
         for entity_id, window in self._humidity_windows.items():
             if len(window) >= 2:
-                deltas[entity_id] = round(window[-1][1] - window[0][1], 1)
+                elapsed_seconds = window[-1][0] - window[0][0]
+                if elapsed_seconds < 1.0:
+                    deltas[entity_id] = 0.0
+                else:
+                    elapsed_minutes = elapsed_seconds / 60.0
+                    deltas[entity_id] = round(
+                        (window[-1][1] - window[0][1]) / elapsed_minutes, 1
+                    )
             else:
                 deltas[entity_id] = 0.0
         return deltas
 
     @property
     def max_humidity_delta(self) -> float:
-        """Return the maximum humidity delta across all monitored sensors.
+        """Return the maximum humidity rate of change (%/min) across all sensors.
 
         This is the most useful single number for the user — shows the highest
-        spike happening right now across all sensors.
+        spike rate happening right now across all sensors.
         """
         deltas = self.humidity_deltas
         if not deltas:
@@ -190,7 +202,6 @@ class BrinkAutomationController:
             )
             return
 
-        self._season = self._evaluate_season()
         self._state = AutomationState.BASE
 
         # Ensure humidity listeners are running (may already be from monitoring)
@@ -202,10 +213,7 @@ class BrinkAutomationController:
             options={**self._entry.options, "adaptive_active": True},
         )
 
-        base_level = self._get_seasonal_base_level()
-        params = self._build_mode_and_level_params(mode_value="1", level_value=str(base_level))
-        if params:
-            await self.async_write_params(params)
+        base_level = await self._async_apply_seasonal_level(boosted=False)
 
         _LOGGER.info(
             "Automation activated: season=%s, base_level=%s",
@@ -221,6 +229,10 @@ class BrinkAutomationController:
         """
         _LOGGER.info("Automation deactivating from state %s", self._state)
 
+        if self._pending_task and not self._pending_task.done():
+            self._pending_task.cancel()
+        self._pending_task = None
+        self._boost_pending = False
         self._cancel_boost_timer()
         self._cancel_countdown_timer()
         self._pending_writes = None
@@ -243,17 +255,14 @@ class BrinkAutomationController:
         Sets the device to the seasonal max level in manual mode and starts
         the boost timer.
         """
+        self._boost_pending = False
         self._was_in_base_before_boost = self._state == AutomationState.BASE
 
-        self._season = self._evaluate_season()
-        max_level = self._get_seasonal_max_level()
         duration_minutes: int = int(
             self._entry.options.get(CONF_EXTRA_VENT_DURATION, DEFAULT_EXTRA_VENT_DURATION)
         )
 
-        params = self._build_mode_and_level_params(mode_value="1", level_value=str(max_level))
-        if params:
-            await self.async_write_params(params)
+        max_level = await self._async_apply_seasonal_level(boosted=True)
 
         # Cancel existing boost timer before starting a new one
         self._cancel_boost_timer()
@@ -295,14 +304,7 @@ class BrinkAutomationController:
         if self._was_in_base_before_boost:
             _LOGGER.info("Extra ventilation cancelled, returning to BASE")
             self._state = AutomationState.BASE
-            self._season = self._evaluate_season()
-
-            base_level = self._get_seasonal_base_level()
-            params = self._build_mode_and_level_params(
-                mode_value="1", level_value=str(base_level)
-            )
-            if params:
-                await self.async_write_params(params)
+            await self._async_apply_seasonal_level(boosted=False)
         else:
             _LOGGER.info("Extra ventilation cancelled, returning to IDLE")
             self._state = AutomationState.IDLE
@@ -325,20 +327,9 @@ class BrinkAutomationController:
 
         if old_season != self._season and self._season is not None:
             _LOGGER.info("Season changed: %s -> %s", old_season, self._season)
-            if self._state == AutomationState.BASE:
-                base_level = self._get_seasonal_base_level()
-                params = self._build_mode_and_level_params(
-                    mode_value="1", level_value=str(base_level)
-                )
-                if params:
-                    await self.async_write_params(params)
-            elif self._state == AutomationState.BOOSTED:
-                max_level = self._get_seasonal_max_level()
-                params = self._build_mode_and_level_params(
-                    mode_value="1", level_value=str(max_level)
-                )
-                if params:
-                    await self.async_write_params(params)
+            await self._async_apply_seasonal_level(
+                boosted=(self._state == AutomationState.BOOSTED)
+            )
 
         await self._async_retry_pending_writes()
 
@@ -386,23 +377,16 @@ class BrinkAutomationController:
                 old_season,
                 self._season,
             )
-            if self._state == AutomationState.BASE:
-                base_level = self._get_seasonal_base_level()
-                params = self._build_mode_and_level_params(
-                    mode_value="1", level_value=str(base_level)
-                )
-                if params:
-                    await self.async_write_params(params)
-            elif self._state == AutomationState.BOOSTED:
-                max_level = self._get_seasonal_max_level()
-                params = self._build_mode_and_level_params(
-                    mode_value="1", level_value=str(max_level)
-                )
-                if params:
-                    await self.async_write_params(params)
+            await self._async_apply_seasonal_level(
+                boosted=(self._state == AutomationState.BOOSTED)
+            )
 
     async def async_cleanup(self) -> None:
         """Cancel all timers and listeners, clear state."""
+        if self._pending_task and not self._pending_task.done():
+            self._pending_task.cancel()
+        self._pending_task = None
+        self._boost_pending = False
         self._cancel_boost_timer()
         self._cancel_countdown_timer()
         self._remove_humidity_listeners()
@@ -432,6 +416,13 @@ class BrinkAutomationController:
             await self._coordinator.client.write_parameters(
                 system_id, gateway_id, params
             )
+        except BrinkAuthError:
+            _LOGGER.error(
+                "Write failed due to authentication error, not retrying: %s",
+                params,
+            )
+            self._pending_writes = None
+            return
         except Exception:
             _LOGGER.warning(
                 "Write failed, queuing for retry: %s",
@@ -465,17 +456,13 @@ class BrinkAutomationController:
             if self._was_in_base_before_boost:
                 _LOGGER.info("Boost timer expired, transitioning to BASE")
                 self._state = AutomationState.BASE
-                self._season = self._evaluate_season()
 
-                base_level = self._get_seasonal_base_level()
-                params = self._build_mode_and_level_params(
-                    mode_value="1", level_value=str(base_level)
+                if self._pending_task and not self._pending_task.done():
+                    self._pending_task.cancel()
+                self._pending_task = self._hass.async_create_task(
+                    self._safe_apply_seasonal_level(boosted=False),
+                    "brink_ventilation_boost_return_to_base",
                 )
-                if params:
-                    self._hass.async_create_task(
-                        self._safe_write_params(params),
-                        "brink_ventilation_boost_return_to_base",
-                    )
 
                 # Humidity monitoring resumes automatically since the _async_humidity_state_changed
                 # handler checks for BASE state — no need to restart listeners
@@ -602,20 +589,32 @@ class BrinkAutomationController:
                     CONF_HUMIDITY_SPIKE_THRESHOLD, DEFAULT_HUMIDITY_SPIKE_THRESHOLD
                 )
             )
+            elapsed_seconds = window[-1][0] - window[0][0]
+            if elapsed_seconds < 1.0:
+                return
+
             oldest_value = window[0][1]
             newest_value = window[-1][1]
+            elapsed_minutes = elapsed_seconds / 60.0
+            rate = (newest_value - oldest_value) / elapsed_minutes
 
-            if (newest_value - oldest_value) >= threshold:
+            if rate >= threshold:
+                if self._boost_pending:
+                    window.clear()
+                    return
                 _LOGGER.info(
-                    "Humidity spike detected on %s: %.1f -> %.1f (threshold %.1f)",
+                    "Humidity spike detected on %s: %.1f -> %.1f (%.1f %%/min, threshold %.1f %%/min)",
                     entity_id,
                     oldest_value,
                     newest_value,
+                    rate,
                     threshold,
                 )
-                # Clear window to prevent re-triggering immediately
+                self._boost_pending = True
                 window.clear()
-                self._hass.async_create_task(
+                if self._pending_task and not self._pending_task.done():
+                    self._pending_task.cancel()
+                self._pending_task = self._hass.async_create_task(
                     self._safe_activate_extra_ventilation(),
                     "brink_ventilation_humidity_boost",
                 )
@@ -623,13 +622,6 @@ class BrinkAutomationController:
     # ------------------------------------------------------------------
     # Safe wrappers for fire-and-forget tasks
     # ------------------------------------------------------------------
-
-    async def _safe_write_params(self, params: list[tuple[int, str]]) -> None:
-        """Write params with error logging for fire-and-forget tasks."""
-        try:
-            await self.async_write_params(params)
-        except Exception:
-            _LOGGER.exception("Error writing params from timer callback")
 
     async def _safe_activate_extra_ventilation(self) -> None:
         """Activate extra ventilation with error logging for fire-and-forget tasks."""
@@ -714,6 +706,22 @@ class BrinkAutomationController:
         if self._season == SEASON_WINTER:
             return int(options.get(CONF_EXTRA_VENT_WINTER_LEVEL, DEFAULT_EXTRA_VENT_WINTER_LEVEL))
         return int(options.get(CONF_EXTRA_VENT_SUMMER_LEVEL, DEFAULT_EXTRA_VENT_SUMMER_LEVEL))
+
+    async def _async_apply_seasonal_level(self, boosted: bool = False) -> int:
+        """Evaluate season and write the appropriate ventilation level. Returns the level used."""
+        self._season = self._evaluate_season()
+        level = self._get_seasonal_max_level() if boosted else self._get_seasonal_base_level()
+        params = self._build_mode_and_level_params(mode_value="1", level_value=str(level))
+        if params:
+            await self.async_write_params(params)
+        return level
+
+    async def _safe_apply_seasonal_level(self, boosted: bool = False) -> None:
+        """Apply seasonal level with error logging for fire-and-forget tasks."""
+        try:
+            await self._async_apply_seasonal_level(boosted=boosted)
+        except Exception:
+            _LOGGER.exception("Error applying seasonal level from timer callback")
 
     # ------------------------------------------------------------------
     # Parameter lookup helpers

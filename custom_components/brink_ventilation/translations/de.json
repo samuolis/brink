@@ -59,7 +59,7 @@
           "humidity_sensor_1": "Feuchtigkeitssensor 1",
           "humidity_sensor_2": "Feuchtigkeitssensor 2",
           "humidity_sensor_3": "Feuchtigkeitssensor 3",
-          "humidity_spike_threshold": "Feuchtigkeitsanstieg-Schwellenwert"
+          "humidity_spike_threshold": "Feuchtigkeits-Raten-Schwellenwert"
         },
         "data_description": {
           "auto_summer_base_level": "Normale L\u00fcftungsstufe im Sommer (\u00fcber der Frostgrenze).",
@@ -67,7 +67,7 @@
           "humidity_sensor_1": "Optional: Erster Feuchtigkeitssensor zur \u00dcberwachung von Anstiegen (z.B. Badezimmer).",
           "humidity_sensor_2": "Optional: Zweiter Feuchtigkeitssensor zur \u00dcberwachung.",
           "humidity_sensor_3": "Optional: Dritter Feuchtigkeitssensor zur \u00dcberwachung.",
-          "humidity_spike_threshold": "Feuchtigkeitsanstieg (%) innerhalb von 3 Minuten, der den Zusatzl\u00fcftungs-Boost ausl\u00f6st."
+          "humidity_spike_threshold": "Feuchtigkeitsänderungsrate (%/min), die den Zusatzl\u00fcftungs-Boost ausl\u00f6st."
         }
       }
     },
@@ -192,13 +192,13 @@
         }
       },
       "humidity_delta_1": {
-        "name": "Feuchtigkeitsänderung Sensor 1 (3 Min.)"
+        "name": "Feuchtigkeitsrate Sensor 1 (%/min)"
       },
       "humidity_delta_2": {
-        "name": "Feuchtigkeitsänderung Sensor 2 (3 Min.)"
+        "name": "Feuchtigkeitsrate Sensor 2 (%/min)"
       },
       "humidity_delta_3": {
-        "name": "Feuchtigkeitsänderung Sensor 3 (3 Min.)"
+        "name": "Feuchtigkeitsrate Sensor 3 (%/min)"
       }
     },
     "switch": {

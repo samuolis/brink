@@ -87,15 +87,11 @@ async def _async_test_credentials(
     Raises BrinkAuthError or aiohttp exceptions on failure.
     """
     session = async_get_clientsession(hass)
-    # Create a standalone session (not HA-managed) so we can safely close it
-    temp_old_session = aiohttp.ClientSession(
-        cookie_jar=aiohttp.CookieJar(unsafe=False)
-    )
+    client = BrinkHomeCloud(session, username, password)
     try:
-        client = BrinkHomeCloud(session, temp_old_session, username, password)
         await client.login()
     finally:
-        await temp_old_session.close()
+        await client.close()
 
 
 class BrinkHomeConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -337,12 +333,12 @@ class OptionsFlowHandler(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Step 2: Extra ventilation settings."""
+        if not hasattr(self, "_options_data"):
+            self._options_data = dict(self.config_entry.options)
+
         if user_input is not None:
             self._options_data.update(user_input)
             return await self.async_step_adaptive()
-
-        if not hasattr(self, "_options_data"):
-            self._options_data = {}
 
         opts = self.config_entry.options
 
@@ -478,7 +474,7 @@ class OptionsFlowHandler(OptionsFlow):
                             max=MAX_HUMIDITY_SPIKE_THRESHOLD,
                             step=0.5,
                             mode=NumberSelectorMode.BOX,
-                            unit_of_measurement="%",
+                            unit_of_measurement="%/min",
                         )
                     ),
                 }

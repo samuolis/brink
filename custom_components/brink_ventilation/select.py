@@ -245,7 +245,10 @@ class BrinkHomeVentilationLevelSelectEntity(BrinkHomeSelectEntity):
         value = param.get("value")
         if value is None:
             return None
-        return f"{value} m³/h"
+        try:
+            return f"{float(value):.0f} m³/h"
+        except (ValueError, TypeError):
+            return None
 
     @property
     def extra_state_attributes(self) -> dict[str, str | None]:
