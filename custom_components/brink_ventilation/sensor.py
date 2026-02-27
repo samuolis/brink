@@ -391,6 +391,7 @@ class BrinkHumidityDeltaEntity(BrinkHomeDeviceEntity, SensorEntity):
 
     _attr_native_unit_of_measurement = "%/min"
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(

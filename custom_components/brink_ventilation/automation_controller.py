@@ -11,16 +11,12 @@ import asyncio
 import logging
 import math
 import time
-from collections import deque
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
-from homeassistant.helpers.event import (
-    async_call_later,
-    async_track_state_change_event,
-)
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers.event import async_call_later
 
 from .core.brink_home_cloud import BrinkAuthError
 from .const import (
@@ -42,8 +38,6 @@ from .const import (
     DEFAULT_EXTRA_VENT_WINTER_LEVEL,
     DEFAULT_FREEZING_THRESHOLD,
     DEFAULT_HUMIDITY_SPIKE_THRESHOLD,
-    HUMIDITY_MIN_SAMPLE_INTERVAL,
-    HUMIDITY_WINDOW_SECONDS,
     PARAM_FRESH_AIR_TEMP,
     PARAM_OPERATING_MODE,
     PARAM_VENTILATION_LEVEL,
@@ -91,8 +85,10 @@ class BrinkAutomationController:
         self._state: AutomationState = AutomationState.IDLE
         self._season: str | None = None
 
-        # Humidity rolling windows: entity_id -> deque of (timestamp, value)
-        self._humidity_windows: dict[str, deque[tuple[float, float]]] = {}
+        # Two-point humidity tracking: entity_id -> (monotonic_timestamp, value)
+        self._humidity_previous: dict[str, tuple[float, float]] = {}
+        # Last computed rate per sensor: entity_id -> rate (%/min)
+        self._humidity_rates: dict[str, float] = {}
 
         # Resilient write queue -- stores the most recent desired params on failure
         self._pending_writes: list[tuple[int, str]] | None = None
@@ -108,7 +104,7 @@ class BrinkAutomationController:
         # Unsub handles
         self._boost_timer_unsub: CALLBACK_TYPE | None = None
         self._countdown_timer_unsub: CALLBACK_TYPE | None = None
-        self._humidity_listener_unsub: CALLBACK_TYPE | None = None
+        self._humidity_timer_unsub: CALLBACK_TYPE | None = None
 
     # ------------------------------------------------------------------
     # Properties
@@ -152,23 +148,10 @@ class BrinkAutomationController:
     def humidity_deltas(self) -> dict[str, float]:
         """Return current humidity rate of change (%/min) for each monitored sensor.
 
-        Returns a dict of entity_id -> rate value. Rate is 0.0 if window
-        has fewer than 2 readings or elapsed time is too short.
+        Returns a dict of entity_id -> rate value. Rate is 0.0 when the
+        sensor value has not changed since the last timer tick.
         """
-        deltas: dict[str, float] = {}
-        for entity_id, window in self._humidity_windows.items():
-            if len(window) >= 2:
-                elapsed_seconds = window[-1][0] - window[0][0]
-                if elapsed_seconds < 1.0:
-                    deltas[entity_id] = 0.0
-                else:
-                    elapsed_minutes = elapsed_seconds / 60.0
-                    deltas[entity_id] = round(
-                        (window[-1][1] - window[0][1]) / elapsed_minutes, 1
-                    )
-            else:
-                deltas[entity_id] = 0.0
-        return deltas
+        return dict(self._humidity_rates)
 
     @property
     def max_humidity_delta(self) -> float:
@@ -187,12 +170,12 @@ class BrinkAutomationController:
     # ------------------------------------------------------------------
 
     async def async_start_humidity_monitoring(self) -> None:
-        """Start humidity listeners for delta tracking, independent of automation state.
+        """Start humidity timer for delta tracking, independent of automation state.
 
         Called during setup so the humidity delta sensors always have data,
         even when Adaptive (HA) mode is not active.
         """
-        self._start_humidity_listeners()
+        self._start_humidity_timer()
 
     async def async_activate(self) -> None:
         """Transition IDLE -> BASE: start seasonal ventilation and humidity monitoring."""
@@ -204,8 +187,8 @@ class BrinkAutomationController:
 
         self._state = AutomationState.BASE
 
-        # Ensure humidity listeners are running (may already be from monitoring)
-        self._start_humidity_listeners()
+        # Ensure humidity timer is running (may already be from monitoring)
+        self._start_humidity_timer()
 
         # Persist adaptive mode active flag for startup recovery
         self._hass.config_entries.async_update_entry(
@@ -224,7 +207,7 @@ class BrinkAutomationController:
     async def async_deactivate(self) -> None:
         """Transition any state -> IDLE: cancel timers but keep humidity monitoring.
 
-        Humidity listeners remain active so the delta sensors continue to
+        Humidity timer remains active so the delta sensors continue to
         show data even when Adaptive (HA) mode is not active.
         """
         _LOGGER.info("Automation deactivating from state %s", self._state)
@@ -357,12 +340,13 @@ class BrinkAutomationController:
             await self.async_activate()
 
     async def async_options_updated(self) -> None:
-        """Handle options flow update: re-subscribe listeners and re-evaluate season."""
-        # Always re-subscribe humidity listeners (sensors may have changed)
+        """Handle options flow update: restart humidity timer and re-evaluate season."""
+        # Always restart humidity timer (sensors may have changed)
         # This ensures delta sensors work even when not in Adaptive (HA) mode
-        self._remove_humidity_listeners()
-        self._humidity_windows.clear()
-        self._start_humidity_listeners()
+        self._cancel_humidity_timer()
+        self._humidity_previous.clear()
+        self._humidity_rates.clear()
+        self._start_humidity_timer()
 
         if self._state == AutomationState.IDLE:
             return
@@ -382,15 +366,16 @@ class BrinkAutomationController:
             )
 
     async def async_cleanup(self) -> None:
-        """Cancel all timers and listeners, clear state."""
+        """Cancel all timers, clear state."""
         if self._pending_task and not self._pending_task.done():
             self._pending_task.cancel()
         self._pending_task = None
         self._boost_pending = False
         self._cancel_boost_timer()
         self._cancel_countdown_timer()
-        self._remove_humidity_listeners()
-        self._humidity_windows.clear()
+        self._cancel_humidity_timer()
+        self._humidity_previous.clear()
+        self._humidity_rates.clear()
         self._pending_writes = None
         self._boost_end_monotonic = 0.0
         self._state = AutomationState.IDLE
@@ -464,8 +449,8 @@ class BrinkAutomationController:
                     "brink_ventilation_boost_return_to_base",
                 )
 
-                # Humidity monitoring resumes automatically since the _async_humidity_state_changed
-                # handler checks for BASE state — no need to restart listeners
+                # Humidity monitoring resumes automatically since the timer
+                # checks for BASE state — no need to restart it
             else:
                 _LOGGER.info(
                     "Boost timer expired, transitioning to IDLE "
@@ -512,112 +497,110 @@ class BrinkAutomationController:
             self._countdown_timer_unsub = None
 
     # ------------------------------------------------------------------
-    # Humidity monitoring
+    # Humidity monitoring (timer-based two-point comparison)
     # ------------------------------------------------------------------
 
-    def _start_humidity_listeners(self) -> None:
-        """Subscribe to state changes for configured humidity sensors."""
-        self._remove_humidity_listeners()
+    _HUMIDITY_CHECK_INTERVAL = 60  # seconds between humidity checks
+
+    def _start_humidity_timer(self) -> None:
+        """Start a periodic 60-second timer to check humidity sensors."""
+        self._cancel_humidity_timer()
         sensors = self.configured_humidity_sensors
         if not sensors:
-            _LOGGER.debug("No humidity sensors configured, skipping listeners")
+            _LOGGER.debug("No humidity sensors configured, skipping timer")
             return
 
-        self._humidity_listener_unsub = async_track_state_change_event(
-            self._hass, sensors, self._async_humidity_state_changed
-        )
-        _LOGGER.debug("Started humidity listeners for: %s", sensors)
+        @callback
+        def _humidity_tick(_now: Any) -> None:
+            """Read each humidity sensor, compute rate, check for spikes."""
+            now = time.monotonic()
+            spike_entity: str | None = None
+            spike_rate: float = 0.0
 
-    def _remove_humidity_listeners(self) -> None:
-        """Remove humidity sensor state-change listeners."""
-        if self._humidity_listener_unsub is not None:
-            self._humidity_listener_unsub()
-            self._humidity_listener_unsub = None
+            for entity_id in self.configured_humidity_sensors:
+                state = self._hass.states.get(entity_id)
+                if state is None or state.state in (None, "", "unavailable", "unknown"):
+                    continue
 
-    @callback
-    def _async_humidity_state_changed(self, event: Event) -> None:
-        """Handle humidity sensor state changes.
+                try:
+                    value = float(state.state)
+                except (ValueError, TypeError):
+                    continue
 
-        Always tracks rolling window data (for delta sensors), but only
-        triggers boost when in BASE state (spike detection).
-        """
-        entity_id: str = event.data.get("entity_id", "")
-        new_state = event.data.get("new_state")
-        if new_state is None:
-            return
+                if math.isnan(value) or math.isinf(value):
+                    continue
+                if value < 0.0 or value > 100.0:
+                    continue
 
-        state_value = new_state.state
-        if state_value in (None, "", "unavailable", "unknown"):
-            return
+                if entity_id not in self._humidity_previous:
+                    # First reading — store and move on
+                    self._humidity_previous[entity_id] = (now, value)
+                    self._humidity_rates[entity_id] = 0.0
+                    continue
 
-        try:
-            value = float(state_value)
-        except (ValueError, TypeError):
-            return
+                old_time, old_value = self._humidity_previous[entity_id]
+                elapsed_minutes = (now - old_time) / 60.0
 
-        # Guard against NaN, Infinity, and physically impossible values
-        if math.isnan(value) or math.isinf(value):
-            _LOGGER.debug("Ignoring non-finite humidity value from %s: %s", entity_id, value)
-            return
+                if elapsed_minutes > 0.0 and value != old_value:
+                    rate = round((value - old_value) / elapsed_minutes, 1)
+                    self._humidity_rates[entity_id] = rate
 
-        if value < 0.0 or value > 100.0:
-            _LOGGER.debug("Ignoring out-of-range humidity value from %s: %.1f", entity_id, value)
-            return
+                    # Track highest spike for boost trigger
+                    if rate > spike_rate:
+                        spike_rate = rate
+                        spike_entity = entity_id
+                else:
+                    self._humidity_rates[entity_id] = 0.0
 
-        now = time.monotonic()
+                # Always replace previous (keeps elapsed ~1 min for sensitivity)
+                self._humidity_previous[entity_id] = (now, value)
 
-        # Get or create rolling window for this sensor
-        if entity_id not in self._humidity_windows:
-            self._humidity_windows[entity_id] = deque()
-        window = self._humidity_windows[entity_id]
-
-        # Enforce minimum sample interval
-        if window and (now - window[-1][0]) < HUMIDITY_MIN_SAMPLE_INTERVAL:
-            return
-
-        window.append((now, value))
-
-        # Trim entries older than HUMIDITY_WINDOW_SECONDS
-        cutoff = now - HUMIDITY_WINDOW_SECONDS
-        while window and window[0][0] < cutoff:
-            window.popleft()
-
-        # Spike detection — only trigger boost when in BASE state
-        if self._state == AutomationState.BASE and len(window) >= 2:
-            threshold: float = float(
-                self._entry.options.get(
-                    CONF_HUMIDITY_SPIKE_THRESHOLD, DEFAULT_HUMIDITY_SPIKE_THRESHOLD
+            # Spike detection — only trigger boost when in BASE state
+            if (
+                spike_entity is not None
+                and self._state == AutomationState.BASE
+                and not self._boost_pending
+            ):
+                threshold: float = float(
+                    self._entry.options.get(
+                        CONF_HUMIDITY_SPIKE_THRESHOLD,
+                        DEFAULT_HUMIDITY_SPIKE_THRESHOLD,
+                    )
                 )
+                if spike_rate >= threshold:
+                    _LOGGER.info(
+                        "Humidity spike detected on %s: %.1f %%/min "
+                        "(threshold %.1f %%/min)",
+                        spike_entity,
+                        spike_rate,
+                        threshold,
+                    )
+                    self._boost_pending = True
+                    if self._pending_task and not self._pending_task.done():
+                        self._pending_task.cancel()
+                    self._pending_task = self._hass.async_create_task(
+                        self._safe_activate_extra_ventilation(),
+                        "brink_ventilation_humidity_boost",
+                    )
+
+            # Trigger entity state update so delta sensors reflect new rates
+            self._coordinator.async_set_updated_data(self._coordinator.data)
+
+            # Reschedule
+            self._humidity_timer_unsub = async_call_later(
+                self._hass, self._HUMIDITY_CHECK_INTERVAL, _humidity_tick
             )
-            elapsed_seconds = window[-1][0] - window[0][0]
-            if elapsed_seconds < 1.0:
-                return
 
-            oldest_value = window[0][1]
-            newest_value = window[-1][1]
-            elapsed_minutes = elapsed_seconds / 60.0
-            rate = (newest_value - oldest_value) / elapsed_minutes
+        self._humidity_timer_unsub = async_call_later(
+            self._hass, self._HUMIDITY_CHECK_INTERVAL, _humidity_tick
+        )
+        _LOGGER.debug("Started humidity timer for: %s", sensors)
 
-            if rate >= threshold:
-                if self._boost_pending:
-                    window.clear()
-                    return
-                _LOGGER.info(
-                    "Humidity spike detected on %s: %.1f -> %.1f (%.1f %%/min, threshold %.1f %%/min)",
-                    entity_id,
-                    oldest_value,
-                    newest_value,
-                    rate,
-                    threshold,
-                )
-                self._boost_pending = True
-                window.clear()
-                if self._pending_task and not self._pending_task.done():
-                    self._pending_task.cancel()
-                self._pending_task = self._hass.async_create_task(
-                    self._safe_activate_extra_ventilation(),
-                    "brink_ventilation_humidity_boost",
-                )
+    def _cancel_humidity_timer(self) -> None:
+        """Cancel the humidity check timer if active."""
+        if self._humidity_timer_unsub is not None:
+            self._humidity_timer_unsub()
+            self._humidity_timer_unsub = None
 
     # ------------------------------------------------------------------
     # Safe wrappers for fire-and-forget tasks

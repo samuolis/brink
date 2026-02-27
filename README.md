@@ -45,9 +45,9 @@ The integration exposes up to 20 parameters from the Brink Home API as Home Assi
 | CO2 sensor 4 | ppm | CO2 concentration from sensor 4 | Disabled |
 | Extra ventilation remaining | minutes | Countdown timer for active extra ventilation boost | Enabled |
 | Current season | enum | Current season (Summer/Winter) based on outdoor temperature vs freezing threshold | Enabled |
-| Humidity rate sensor 1 (%/min) | %/min | Humidity rate of change for monitored sensor 1, calculated over a 3-minute rolling window. Shows unavailable when no sensor is assigned. | Enabled |
-| Humidity rate sensor 2 (%/min) | %/min | Humidity rate of change for monitored sensor 2, calculated over a 3-minute rolling window. Shows unavailable when no sensor is assigned. | Enabled |
-| Humidity rate sensor 3 (%/min) | %/min | Humidity rate of change for monitored sensor 3, calculated over a 3-minute rolling window. Shows unavailable when no sensor is assigned. | Enabled |
+| Humidity rate sensor 1 (%/min) | %/min | Humidity rate of change for monitored sensor 1, checked every 60 seconds. Shows unavailable when no sensor is assigned. | Enabled |
+| Humidity rate sensor 2 (%/min) | %/min | Humidity rate of change for monitored sensor 2, checked every 60 seconds. Shows unavailable when no sensor is assigned. | Enabled |
+| Humidity rate sensor 3 (%/min) | %/min | Humidity rate of change for monitored sensor 3, checked every 60 seconds. Shows unavailable when no sensor is assigned. | Enabled |
 | Heat recovery efficiency | % | Heat exchanger efficiency calculated from supply, fresh air, and indoor temperatures. Shows 0% when bypass is open or temperatures are equal. Requires at least one indoor temperature sensor configured. | Enabled |
 
 ### Select Controls
@@ -167,9 +167,9 @@ Select **Adaptive (HA)** in the ventilation level control to enable automatic hu
 
 ### How Humidity Spike Detection Works
 
-- The integration monitors configured humidity sensors, sampling at most every 30 seconds.
-- It maintains a 3-minute rolling window of readings per sensor.
-- The rate of change (%/min) is calculated as `(newest - oldest) / elapsed_minutes` over the window.
+- The integration checks configured humidity sensors every 60 seconds.
+- Each tick compares the current value to the previous stored value and calculates the rate of change (%/min).
+- The stored previous value (including timestamp) is always replaced, keeping the comparison window at ~1 minute. This ensures spikes are detected even with slow-updating sensors.
 - If the rate exceeds the spike threshold, extra ventilation is triggered.
 - The **Humidity rate sensor** entities (one per configured sensor) show the current rate, which helps you fine-tune the threshold by reviewing their history.
 

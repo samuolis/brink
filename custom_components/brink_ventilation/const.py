@@ -44,10 +44,6 @@ MAX_EXTRA_VENT_DURATION = 480
 MIN_HUMIDITY_SPIKE_THRESHOLD = 0.5  # %/min
 MAX_HUMIDITY_SPIKE_THRESHOLD = 20.0  # %/min
 
-# Humidity monitoring
-HUMIDITY_WINDOW_SECONDS = 180  # 3 minutes of rolling history
-HUMIDITY_MIN_SAMPLE_INTERVAL = 30  # seconds between samples
-
 # Season enum values
 SEASON_SUMMER = "summer"
 SEASON_WINTER = "winter"
