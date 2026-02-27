@@ -45,9 +45,9 @@ The integration exposes up to 20 parameters from the Brink Home API as Home Assi
 | CO2 sensor 4 | ppm | CO2 concentration from sensor 4 | Disabled |
 | Extra ventilation remaining | minutes | Countdown timer for active extra ventilation boost | Enabled |
 | Current season | enum | Current season (Summer/Winter) based on outdoor temperature vs freezing threshold | Enabled |
-| Humidity change sensor 1 (3 min) | % | Humidity change for monitored sensor 1 in the last 3 minutes. Shows unavailable when no sensor is assigned. | Enabled |
-| Humidity change sensor 2 (3 min) | % | Humidity change for monitored sensor 2 in the last 3 minutes. Shows unavailable when no sensor is assigned. | Enabled |
-| Humidity change sensor 3 (3 min) | % | Humidity change for monitored sensor 3 in the last 3 minutes. Shows unavailable when no sensor is assigned. | Enabled |
+| Humidity rate sensor 1 (%/min) | %/min | Humidity rate of change for monitored sensor 1, calculated over a 3-minute rolling window. Shows unavailable when no sensor is assigned. | Enabled |
+| Humidity rate sensor 2 (%/min) | %/min | Humidity rate of change for monitored sensor 2, calculated over a 3-minute rolling window. Shows unavailable when no sensor is assigned. | Enabled |
+| Humidity rate sensor 3 (%/min) | %/min | Humidity rate of change for monitored sensor 3, calculated over a 3-minute rolling window. Shows unavailable when no sensor is assigned. | Enabled |
 
 ### Select Controls
 
@@ -131,7 +131,7 @@ After setup, configure the integration options:
 | Summer base level | 2 | 0–3 | Normal ventilation level in summer |
 | Winter base level | 1 | 0–3 | Normal ventilation level in winter |
 | Humidity sensor 1–3 | _(empty)_ | Entity selector | Up to 3 humidity sensors to monitor for spikes |
-| Humidity spike threshold | 5 | 1–60 % | Humidity increase within 3 minutes that triggers extra ventilation |
+| Humidity spike rate threshold | 2 | 0.5–20 %/min | Humidity rate of change (%/min) that triggers extra ventilation |
 
 ## Removal
 
@@ -158,7 +158,7 @@ The winter/summer split exists because Brink ventilation units have a preheater 
 Select **Adaptive (HA)** in the ventilation level control to enable automatic humidity-responsive ventilation:
 
 1. The device is set to Manual mode at the seasonal **base level** (summer or winter, depending on outdoor temperature).
-2. Up to 3 humidity sensors are monitored. If any sensor detects a rapid humidity increase (configurable threshold) within 3 minutes — for example, from someone taking a shower — the **extra ventilation boost** is automatically triggered.
+2. Up to 3 humidity sensors are monitored. If any sensor's humidity rate of change exceeds the configured threshold (%/min) — for example, from someone taking a shower — the **extra ventilation boost** is automatically triggered.
 3. After the boost timer expires, ventilation returns to the seasonal base level.
 4. If the outdoor temperature crosses the freezing threshold (season changes), ventilation levels are automatically adjusted.
 
@@ -166,8 +166,9 @@ Select **Adaptive (HA)** in the ventilation level control to enable automatic hu
 
 - The integration monitors configured humidity sensors, sampling at most every 30 seconds.
 - It maintains a 3-minute rolling window of readings per sensor.
-- If the difference between the newest and oldest reading in the window exceeds the spike threshold, extra ventilation is triggered.
-- The **Humidity change sensor** entities (one per configured sensor) show the current delta, which helps you fine-tune the threshold by reviewing their history.
+- The rate of change (%/min) is calculated as `(newest - oldest) / elapsed_minutes` over the window.
+- If the rate exceeds the spike threshold, extra ventilation is triggered.
+- The **Humidity rate sensor** entities (one per configured sensor) show the current rate, which helps you fine-tune the threshold by reviewing their history.
 
 ### Internet Resilience
 
