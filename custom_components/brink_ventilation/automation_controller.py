@@ -780,7 +780,7 @@ class BrinkAutomationController:
     # Parameter lookup helpers
     # ------------------------------------------------------------------
 
-    def _find_param_value_id(self, param_id: int) -> int | None:
+    def _find_param_value_id(self, param_id: str) -> int | None:
         """Find the value_id for a parameter across all systems and components."""
         data = self._coordinator.data
         if not data:

@@ -67,27 +67,53 @@ OIDC_CLIENT_ID = "spa"
 OIDC_REDIRECT_URI = "https://www.brink-home.com/app"
 OIDC_SCOPE = "openid api role locale"
 
-# Parameter IDs
-PARAM_DEVICE_TYPE = 17000
-PARAM_SOFTWARE_LABEL = 17002
-PARAM_FILTER_STATUS = 17006
-PARAM_DAYS_SINCE_FILTER_RESET = 17007
-PARAM_ACTIVE_CONTROL_STATUS = 17009
-PARAM_VENTILATION_LEVEL = 17011
-PARAM_OPERATING_MODE = 17012
-PARAM_REMAINING_DURATION = 17013
-PARAM_SUPPLY_AIR_FLOW = 17015
-PARAM_EXHAUST_AIR_FLOW = 17017
-PARAM_FRESH_AIR_TEMP = 17019
-PARAM_SUPPLY_TEMP = 17020
-PARAM_BYPASS_VALVE_STATUS = 17024
-PARAM_PREHEATER_STATUS = 17025
-PARAM_HUMIDITY = 17026
-PARAM_CO2_SENSOR_1 = 17027
-PARAM_CO2_SENSOR_2 = 17028
-PARAM_CO2_SENSOR_3 = 17029
-PARAM_CO2_SENSOR_4 = 17030
-PARAM_BYPASS_OPERATION = 17143
+# Canonical parameter keys (matched by German API name, not numeric ID)
+PARAM_DEVICE_TYPE = "device_type"
+PARAM_SOFTWARE_LABEL = "software_label"
+PARAM_FILTER_STATUS = "filter_status"
+PARAM_DAYS_SINCE_FILTER_RESET = "days_since_filter_reset"
+PARAM_ACTIVE_CONTROL_STATUS = "active_control_status"
+PARAM_VENTILATION_LEVEL = "ventilation_level"
+PARAM_OPERATING_MODE = "operating_mode"
+PARAM_REMAINING_DURATION = "remaining_duration"
+PARAM_SUPPLY_AIR_FLOW = "supply_air_flow"
+PARAM_EXHAUST_AIR_FLOW = "exhaust_air_flow"
+PARAM_FRESH_AIR_TEMP = "fresh_air_temp"
+PARAM_SUPPLY_TEMP = "supply_temp"
+PARAM_BYPASS_VALVE_STATUS = "bypass_valve_status"
+PARAM_PREHEATER_STATUS = "preheater_status"
+PARAM_HUMIDITY = "humidity"
+PARAM_CO2_SENSOR_1 = "co2_sensor_1"
+PARAM_CO2_SENSOR_2 = "co2_sensor_2"
+PARAM_CO2_SENSOR_3 = "co2_sensor_3"
+PARAM_CO2_SENSOR_4 = "co2_sensor_4"
+PARAM_BYPASS_OPERATION = "bypass_operation"
+
+# German API name → canonical parameter key.
+# Different Brink device models may use different numeric parameter IDs
+# but the German firmware names are consistent across models.
+PARAM_NAME_MAP: dict[str, str] = {
+    "deviceTypeTitle": PARAM_DEVICE_TYPE,
+    "softwareLabel": PARAM_SOFTWARE_LABEL,
+    "Status Filtermeldung": PARAM_FILTER_STATUS,
+    "Anzahl der Tage seit Filterreset": PARAM_DAYS_SINCE_FILTER_RESET,
+    "Aktive Regelung": PARAM_ACTIVE_CONTROL_STATUS,
+    "Lüftungsstufe": PARAM_VENTILATION_LEVEL,
+    "Betriebsart": PARAM_OPERATING_MODE,
+    "Restlaufzeit Betriebsartfunktion": PARAM_REMAINING_DURATION,
+    "Ist-Wert Luftdurchsatz Zuluft": PARAM_SUPPLY_AIR_FLOW,
+    "Ist-Wert Luftdurchsatz Abluft": PARAM_EXHAUST_AIR_FLOW,
+    "Frischlufttemperatur": PARAM_FRESH_AIR_TEMP,
+    "Zulufttemperatur": PARAM_SUPPLY_TEMP,
+    "Status Bypassklappe": PARAM_BYPASS_VALVE_STATUS,
+    "Status Vorheizregister": PARAM_PREHEATER_STATUS,
+    "Relative Feuchte": PARAM_HUMIDITY,
+    "PPM eBus CO2-sensor 1": PARAM_CO2_SENSOR_1,
+    "PPM eBus CO2-sensor 2": PARAM_CO2_SENSOR_2,
+    "PPM eBus CO2-sensor 3": PARAM_CO2_SENSOR_3,
+    "PPM eBus CO2-sensor 4": PARAM_CO2_SENSOR_4,
+    "Funktion der Bypass Klappe": PARAM_BYPASS_OPERATION,
+}
 
 # Value maps (API value -> translation key)
 # Display labels are defined in translations/{lang}.json

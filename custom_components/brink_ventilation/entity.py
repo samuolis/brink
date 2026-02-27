@@ -20,7 +20,7 @@ class BrinkHomeDeviceEntity(CoordinatorEntity[BrinkDataCoordinator]):
         self,
         coordinator: BrinkDataCoordinator,
         system_id: int,
-        param_id: int,
+        param_id: str,
         entity_key: str,
     ) -> None:
         """Initialize the Brink home entity."""
@@ -49,7 +49,7 @@ class BrinkHomeDeviceEntity(CoordinatorEntity[BrinkDataCoordinator]):
         return None
 
     @property
-    def _parameters(self) -> dict[int, dict[str, Any]]:
+    def _parameters(self) -> dict[str, dict[str, Any]]:
         """Return the parameter dict for this entity's component."""
         component = self._component
         return component.get("parameters", {}) if component else {}
@@ -59,7 +59,7 @@ class BrinkHomeDeviceEntity(CoordinatorEntity[BrinkDataCoordinator]):
         """Return this entity's specific parameter dict."""
         return self._parameters.get(self._param_id)
 
-    def _get_param_any_component(self, param_id: int) -> dict[str, Any] | None:
+    def _get_param_any_component(self, param_id: str) -> dict[str, Any] | None:
         """Search all components for a parameter by ID."""
         device = self._device
         if device is None:

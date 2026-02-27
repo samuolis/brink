@@ -65,7 +65,7 @@ PARALLEL_UPDATES = 0
 class BrinkSensorDescription(SensorEntityDescription):
     """Describes a Brink sensor entity."""
 
-    param_id: int = 0
+    param_id: str = ""
     enum_map: dict[str, str] | None = None
 
 
@@ -217,7 +217,7 @@ async def async_setup_entry(
 
         for system_id in new_systems:
             device = coordinator.data[system_id]
-            found_params: set[int] = set()
+            found_params: set[str] = set()
             for component in device.get("components", []):
                 params = component.get("parameters", {})
                 for desc in SENSOR_DESCRIPTIONS:
@@ -268,7 +268,7 @@ class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):
         self,
         coordinator: BrinkDataCoordinator,
         system_id: int,
-        param_id: int,
+        param_id: str,
         entity_key: str,
         description: BrinkSensorDescription,
     ) -> None:

@@ -47,7 +47,7 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.coordinator
     known_systems: set[int] = set()
 
-    select_configs: list[tuple[int, str, type[BrinkHomeSelectEntity]]] = [
+    select_configs: list[tuple[str, str, type[BrinkHomeSelectEntity]]] = [
         (PARAM_OPERATING_MODE, "mode", BrinkHomeModeSelectEntity),
         (PARAM_BYPASS_OPERATION, "bypass", BrinkHomeBypassSelectEntity),
         (PARAM_VENTILATION_LEVEL, "ventilation_level", BrinkHomeVentilationLevelSelectEntity),
@@ -68,7 +68,7 @@ async def async_setup_entry(
 
         for system_id in new_systems:
             device = coordinator.data[system_id]
-            found_params: set[int] = set()
+            found_params: set[str] = set()
             for component in device.get("components", []):
                 params = component.get("parameters", {})
                 for param_id, entity_key, cls in select_configs:

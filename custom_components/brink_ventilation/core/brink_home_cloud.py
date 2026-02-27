@@ -22,6 +22,7 @@ from ..const import (
     OIDC_REDIRECT_URI,
     OIDC_SCOPE,
     OIDC_TOKEN_URL,
+    PARAM_NAME_MAP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -49,31 +50,50 @@ def _is_trusted_url(url: str) -> bool:
 
 def _extract_parameters(
     nav_item: dict[str, Any],
-    parameters: dict[int, dict[str, Any]],
+    parameters: dict[str, dict[str, Any]],
     _depth: int = 0,
 ) -> None:
-    """Recursively extract parameters from a navigation item tree."""
+    """Recursively extract parameters from a navigation item tree.
+
+    Parameters are keyed by canonical string key (matched via PARAM_NAME_MAP
+    from the German firmware name). Unrecognized parameters are stored under
+    ``"unknown_{numeric_id}"`` so they still appear in diagnostics.
+    """
     if _depth > 20:
         _LOGGER.warning("Maximum navigation depth reached, stopping recursion")
         return
 
     for group in nav_item.get("parameterGroups", []):
         for param in group.get("parameters", []):
-            param_id = param.get("id")
-            if param_id is not None:
-                parameters[param_id] = {
-                    "name": param.get("name", ""),
-                    "value": param.get("value"),
-                    "value_id": param.get("valueId"),
-                    "value_state": param.get("valueState"),
-                    "read_write": param.get("readWrite"),
-                    "control_type": param.get("controlType"),
-                    "list_items": param.get("listItems"),
-                    "min_value": param.get("minValue"),
-                    "max_value": param.get("maxValue"),
-                    "unit_of_measure": param.get("unitOfMeasure"),
-                    "component_id": param.get("componentId"),
-                }
+            api_name = param.get("name", "")
+            param_key = PARAM_NAME_MAP.get(api_name)
+            if param_key is None:
+                numeric_id = param.get("id")
+                if numeric_id is None:
+                    continue
+                param_key = f"unknown_{numeric_id}"
+                _LOGGER.debug(
+                    "Unrecognized parameter name %r (id=%s), "
+                    "storing as %s",
+                    api_name,
+                    numeric_id,
+                    param_key,
+                )
+
+            parameters[param_key] = {
+                "name": api_name,
+                "value": param.get("value"),
+                "value_id": param.get("valueId"),
+                "value_state": param.get("valueState"),
+                "read_write": param.get("readWrite"),
+                "control_type": param.get("controlType"),
+                "list_items": param.get("listItems"),
+                "min_value": param.get("minValue"),
+                "max_value": param.get("maxValue"),
+                "unit_of_measure": param.get("unit") or param.get("unitOfMeasure"),
+                "component_id": param.get("componentId"),
+                "numeric_id": param.get("id"),
+            }
 
     for child in nav_item.get("navigationItems", []):
         _extract_parameters(child, parameters, _depth + 1)
@@ -644,7 +664,7 @@ class BrinkHomeCloud:
 
         components: list[dict[str, Any]] = []
         for nav_item in nav_items:
-            parameters: dict[int, dict[str, Any]] = {}
+            parameters: dict[str, dict[str, Any]] = {}
             _extract_parameters(nav_item, parameters)
 
             if parameters:

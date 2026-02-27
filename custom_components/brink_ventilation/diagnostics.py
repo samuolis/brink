@@ -23,6 +23,34 @@ TO_REDACT = {
 }
 
 
+def _collect_unrecognized_params(
+    devices: dict[int, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Collect parameters stored under 'unknown_*' keys for diagnostic visibility.
+
+    Returns a list of dicts with the German firmware name, numeric ID, unit,
+    value, and control type so new device models can be easily mapped.
+    """
+    unrecognized: list[dict[str, Any]] = []
+    for device in devices.values():
+        for component in device.get("components", []):
+            comp_name = component.get("name", "Unknown")
+            for key, param in component.get("parameters", {}).items():
+                if not isinstance(key, str) or not key.startswith("unknown_"):
+                    continue
+                unrecognized.append({
+                    "key": key,
+                    "component": comp_name,
+                    "german_name": param.get("name", ""),
+                    "numeric_id": param.get("numeric_id"),
+                    "value": param.get("value"),
+                    "unit": param.get("unit_of_measure"),
+                    "control_type": param.get("control_type"),
+                    "read_write": param.get("read_write"),
+                })
+    return unrecognized
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
     entry: BrinkConfigEntry,
@@ -42,9 +70,16 @@ async def async_get_config_entry_diagnostics(
         f"device_{i}": async_redact_data(v, TO_REDACT)
         for i, (_, v) in enumerate(sorted((coordinator.data or {}).items()))
     }
-    return {
+
+    # Surface unrecognized parameters so new device models can be mapped
+    unrecognized = _collect_unrecognized_params(coordinator.data or {})
+
+    result: dict[str, Any] = {
         "entry_data": async_redact_data(dict(entry.data), TO_REDACT),
         "entry_options": async_redact_data(dict(entry.options), TO_REDACT),
         "devices": devices_redacted,
         "automation_controller": controller_diagnostics,
     }
+    if unrecognized:
+        result["unrecognized_parameters"] = unrecognized
+    return result
