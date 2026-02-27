@@ -33,7 +33,7 @@ DEFAULT_EXTRA_VENT_SUMMER_LEVEL = 3
 DEFAULT_EXTRA_VENT_WINTER_LEVEL = 2
 DEFAULT_AUTO_SUMMER_BASE_LEVEL = 2
 DEFAULT_AUTO_WINTER_BASE_LEVEL = 1
-DEFAULT_HUMIDITY_SPIKE_THRESHOLD = 2.0  # %/min
+DEFAULT_HUMIDITY_SPIKE_THRESHOLD = 1.5  # %/min
 
 # Ranges
 MAX_SCAN_INTERVAL = 300
@@ -47,6 +47,13 @@ MAX_HUMIDITY_SPIKE_THRESHOLD = 20.0  # %/min
 # Season enum values
 SEASON_SUMMER = "summer"
 SEASON_WINTER = "winter"
+
+# Boost trigger types
+BOOST_TRIGGER_HUMIDITY = "humidity_spike"
+
+# Logbook events
+EVENT_BOOST_ACTIVATED = f"{DOMAIN}_boost_activated"
+EVENT_BOOST_DEACTIVATED = f"{DOMAIN}_boost_deactivated"
 
 # API endpoints
 API_URL = "https://www.brink-home.com/portal/api/portal/"

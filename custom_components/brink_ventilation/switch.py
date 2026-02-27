@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant, callback
@@ -86,6 +87,28 @@ class BrinkExtraVentilationSwitch(BrinkHomeDeviceEntity, SwitchEntity):
         return (
             self.coordinator.automation_controller.state == AutomationState.BOOSTED
         )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra state attributes.
+
+        Only adds boost_trigger when activated by automation (humidity spike).
+        Absence of the attribute means it was activated manually.
+        """
+        controller = self.coordinator.automation_controller
+        if controller.state != AutomationState.BOOSTED:
+            return None
+
+        trigger = controller.boost_trigger
+        if trigger is None:
+            return None
+
+        attrs: dict[str, Any] = {"boost_trigger": trigger}
+        if controller.boost_trigger_entity:
+            attrs["boost_trigger_sensor"] = controller.boost_trigger_entity
+        if controller.boost_trigger_rate is not None:
+            attrs["boost_trigger_rate"] = controller.boost_trigger_rate
+        return attrs
 
     async def async_turn_on(self, **kwargs) -> None:
         """Start the extra ventilation boost."""

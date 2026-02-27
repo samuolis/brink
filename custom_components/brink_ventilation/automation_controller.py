@@ -20,6 +20,7 @@ from homeassistant.helpers.event import async_call_later
 
 from .core.brink_home_cloud import BrinkAuthError
 from .const import (
+    BOOST_TRIGGER_HUMIDITY,
     CONF_AUTO_SUMMER_BASE_LEVEL,
     CONF_AUTO_WINTER_BASE_LEVEL,
     CONF_EXTRA_VENT_DURATION,
@@ -38,6 +39,9 @@ from .const import (
     DEFAULT_EXTRA_VENT_WINTER_LEVEL,
     DEFAULT_FREEZING_THRESHOLD,
     DEFAULT_HUMIDITY_SPIKE_THRESHOLD,
+    DOMAIN,
+    EVENT_BOOST_ACTIVATED,
+    EVENT_BOOST_DEACTIVATED,
     PARAM_FRESH_AIR_TEMP,
     PARAM_OPERATING_MODE,
     PARAM_VENTILATION_LEVEL,
@@ -101,6 +105,11 @@ class BrinkAutomationController:
         self._boost_pending: bool = False
         self._pending_task: asyncio.Task[None] | None = None
 
+        # Boost trigger info (None = manual, set only for automation triggers)
+        self._boost_trigger: str | None = None
+        self._boost_trigger_entity: str | None = None
+        self._boost_trigger_rate: float | None = None
+
         # Unsub handles
         self._boost_timer_unsub: CALLBACK_TYPE | None = None
         self._countdown_timer_unsub: CALLBACK_TYPE | None = None
@@ -132,6 +141,27 @@ class BrinkAutomationController:
     def has_pending_writes(self) -> bool:
         """Return True if there are pending writes awaiting retry."""
         return self._pending_writes is not None
+
+    @property
+    def boost_trigger(self) -> str | None:
+        """Return the trigger type for the current boost, or None for manual."""
+        if self._state != AutomationState.BOOSTED:
+            return None
+        return self._boost_trigger
+
+    @property
+    def boost_trigger_entity(self) -> str | None:
+        """Return the entity_id that triggered the boost (humidity spike only)."""
+        if self._state != AutomationState.BOOSTED:
+            return None
+        return self._boost_trigger_entity
+
+    @property
+    def boost_trigger_rate(self) -> float | None:
+        """Return the humidity rate that triggered the boost (%/min)."""
+        if self._state != AutomationState.BOOSTED:
+            return None
+        return self._boost_trigger_rate
 
     @property
     def configured_humidity_sensors(self) -> list[str]:
@@ -219,6 +249,7 @@ class BrinkAutomationController:
         self._pending_writes = None
         self._was_in_base_before_boost = False
         self._boost_end_monotonic = 0.0
+        self._clear_boost_trigger()
         self._state = AutomationState.IDLE
 
         # Clear adaptive mode active flag
@@ -230,14 +261,29 @@ class BrinkAutomationController:
                 options=new_opts,
             )
 
-    async def async_activate_extra_ventilation(self) -> None:
+    async def async_activate_extra_ventilation(
+        self,
+        trigger: str | None = None,
+        trigger_entity: str | None = None,
+        trigger_rate: float | None = None,
+    ) -> None:
         """Activate extra ventilation boost (shared by button and humidity trigger).
 
         Sets the device to the seasonal max level in manual mode and starts
         the boost timer.
+
+        Args:
+            trigger: Trigger type (e.g. BOOST_TRIGGER_HUMIDITY) or None for manual.
+            trigger_entity: Entity ID that caused the trigger (humidity sensor).
+            trigger_rate: Humidity rate of change that triggered the boost (%/min).
         """
         self._boost_pending = False
         self._was_in_base_before_boost = self._state == AutomationState.BASE
+
+        # Store trigger info (None = manual)
+        self._boost_trigger = trigger
+        self._boost_trigger_entity = trigger_entity
+        self._boost_trigger_rate = trigger_rate
 
         duration_minutes: int = int(
             self._entry.options.get(CONF_EXTRA_VENT_DURATION, DEFAULT_EXTRA_VENT_DURATION)
@@ -260,14 +306,18 @@ class BrinkAutomationController:
         self._start_countdown_timer()
         self._state = AutomationState.BOOSTED
 
+        # Fire logbook event
+        self._fire_boost_activated_event(max_level, duration_minutes)
+
         # Trigger immediate entity update so switch/sensor reflect new state
         self._coordinator.async_set_updated_data(self._coordinator.data)
 
         _LOGGER.info(
-            "Extra ventilation activated: season=%s, max_level=%s, duration=%d min",
+            "Extra ventilation activated: season=%s, max_level=%s, duration=%d min, trigger=%s",
             self._season,
             max_level,
             duration_minutes,
+            trigger or "manual",
         )
 
     async def async_cancel_extra_ventilation(self) -> None:
@@ -281,6 +331,11 @@ class BrinkAutomationController:
 
         self._cancel_boost_timer()
         self._cancel_countdown_timer()
+
+        # Fire deactivated event before clearing state
+        self._fire_boost_deactivated_event("cancelled")
+
+        self._clear_boost_trigger()
 
         if self._was_in_base_before_boost:
             _LOGGER.info("Extra ventilation cancelled, returning to BASE")
@@ -374,6 +429,7 @@ class BrinkAutomationController:
         self._humidity_rates.clear()
         self._pending_writes = None
         self._boost_end_monotonic = 0.0
+        self._clear_boost_trigger()
         self._state = AutomationState.IDLE
         self._season = None
 
@@ -434,6 +490,10 @@ class BrinkAutomationController:
         self._cancel_countdown_timer()
 
         if self._state == AutomationState.BOOSTED:
+            # Fire deactivated event before clearing state
+            self._fire_boost_deactivated_event("timer_expired")
+            self._clear_boost_trigger()
+
             if self._was_in_base_before_boost:
                 _LOGGER.info("Boost timer expired, transitioning to BASE")
                 self._state = AutomationState.BASE
@@ -575,7 +635,10 @@ class BrinkAutomationController:
                     try:
                         self._cancel_pending_task()
                         self._pending_task = self._hass.async_create_task(
-                            self._safe_activate_extra_ventilation(),
+                            self._safe_activate_extra_ventilation(
+                                trigger_entity=spike_entity,
+                                trigger_rate=spike_rate,
+                            ),
                             "brink_ventilation_humidity_boost",
                         )
                     except Exception:
@@ -605,10 +668,18 @@ class BrinkAutomationController:
     # Safe wrappers for fire-and-forget tasks
     # ------------------------------------------------------------------
 
-    async def _safe_activate_extra_ventilation(self) -> None:
+    async def _safe_activate_extra_ventilation(
+        self,
+        trigger_entity: str | None = None,
+        trigger_rate: float | None = None,
+    ) -> None:
         """Activate extra ventilation with error logging for fire-and-forget tasks."""
         try:
-            await self.async_activate_extra_ventilation()
+            await self.async_activate_extra_ventilation(
+                trigger=BOOST_TRIGGER_HUMIDITY if trigger_entity else None,
+                trigger_entity=trigger_entity,
+                trigger_rate=trigger_rate,
+            )
         except Exception:
             _LOGGER.exception("Error activating extra ventilation from humidity spike")
 
@@ -758,6 +829,52 @@ class BrinkAutomationController:
                 return system_id, gateway_id
 
         return None, None
+
+    # ------------------------------------------------------------------
+    # Boost trigger helpers
+    # ------------------------------------------------------------------
+
+    def _clear_boost_trigger(self) -> None:
+        """Clear boost trigger info."""
+        self._boost_trigger = None
+        self._boost_trigger_entity = None
+        self._boost_trigger_rate = None
+
+    def _fire_boost_activated_event(
+        self, level: int, duration_minutes: int
+    ) -> None:
+        """Fire a logbook event when extra ventilation boost starts."""
+        event_data: dict[str, Any] = {
+            "entity_id": self._get_switch_entity_id(),
+            "duration": duration_minutes,
+            "level": level,
+            "season": self._season,
+        }
+        if self._boost_trigger == BOOST_TRIGGER_HUMIDITY:
+            event_data["trigger"] = BOOST_TRIGGER_HUMIDITY
+            if self._boost_trigger_entity:
+                event_data["sensor"] = self._boost_trigger_entity
+            if self._boost_trigger_rate is not None:
+                event_data["rate"] = self._boost_trigger_rate
+        self._hass.bus.async_fire(EVENT_BOOST_ACTIVATED, event_data)
+
+    def _fire_boost_deactivated_event(self, reason: str) -> None:
+        """Fire a logbook event when extra ventilation boost ends."""
+        event_data: dict[str, Any] = {
+            "entity_id": self._get_switch_entity_id(),
+            "reason": reason,
+        }
+        if self._boost_trigger == BOOST_TRIGGER_HUMIDITY:
+            event_data["trigger"] = BOOST_TRIGGER_HUMIDITY
+        self._hass.bus.async_fire(EVENT_BOOST_DEACTIVATED, event_data)
+
+    def _get_switch_entity_id(self) -> str:
+        """Return the entity_id for the extra ventilation switch."""
+        data = self._coordinator.data
+        if data:
+            for system_id in data:
+                return f"switch.brink_{system_id}_extra_ventilation"
+        return f"switch.{DOMAIN}_extra_ventilation"
 
     # ------------------------------------------------------------------
     # Timer and task cancellation helpers

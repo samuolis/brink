@@ -376,6 +376,12 @@ class BrinkHomeCloud:
             form_fields = self._extract_form_fields(login_page_html)
             csrf_token = form_fields.get("__requestverificationtoken")
             if not csrf_token:
+                _LOGGER.warning(
+                    "Could not find CSRF token in OIDC login page. "
+                    "The Brink Home website structure may have changed. "
+                    "This is NOT a credentials issue — please report it at "
+                    "https://github.com/samuolis/brink/issues"
+                )
                 raise BrinkAuthError(
                     "Could not find CSRF token in OIDC login page"
                 )
@@ -428,10 +434,23 @@ class BrinkHomeCloud:
                 body = await login_resp.text()
                 if "invalid" in body.lower() or "error" in body.lower():
                     raise BrinkAuthError("Invalid username or password")
+                _LOGGER.warning(
+                    "OIDC login returned 200 without redirect. "
+                    "The Brink Home login flow may have changed. "
+                    "If your credentials are correct, please report this at "
+                    "https://github.com/samuolis/brink/issues"
+                )
                 raise BrinkAuthError(
                     "OIDC login returned 200 - credentials may be invalid"
                 )
             else:
+                _LOGGER.warning(
+                    "OIDC login returned unexpected HTTP %s. "
+                    "The Brink Home website may have changed. "
+                    "Please report this at "
+                    "https://github.com/samuolis/brink/issues",
+                    login_resp.status,
+                )
                 raise BrinkAuthError(
                     f"OIDC login failed with status {login_resp.status}"
                 )
@@ -461,8 +480,12 @@ class BrinkHomeCloud:
 
         if token_resp.status != 200:
             await token_resp.release()
-            _LOGGER.error(
-                "Token exchange failed with HTTP %s", token_resp.status
+            _LOGGER.warning(
+                "OIDC token exchange failed with HTTP %s. "
+                "The Brink Home authentication flow may have changed. "
+                "Please report this at "
+                "https://github.com/samuolis/brink/issues",
+                token_resp.status,
             )
             raise BrinkAuthError(
                 f"OIDC token exchange failed with status {token_resp.status}"
@@ -471,7 +494,12 @@ class BrinkHomeCloud:
         token_json = await token_resp.json()
         access_token = token_json.get("access_token")
         if not access_token:
-            _LOGGER.error("Token response did not contain expected fields")
+            _LOGGER.warning(
+                "OIDC token response missing access_token field. "
+                "The Brink Home authentication flow may have changed. "
+                "Please report this at "
+                "https://github.com/samuolis/brink/issues"
+            )
             raise BrinkAuthError(
                 "OIDC token response did not contain an access token"
             )
