@@ -31,7 +31,7 @@ async def async_get_config_entry_diagnostics(
     coordinator = entry.runtime_data.coordinator
     controller = coordinator.automation_controller
     controller_diagnostics = {
-        "state": controller.state.value if hasattr(controller.state, 'value') else str(controller.state),
+        "state": str(controller.state),
         "season": controller.season,
         "boost_remaining_minutes": controller.boost_remaining_minutes,
         "has_pending_writes": controller.has_pending_writes,

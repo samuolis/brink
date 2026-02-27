@@ -101,11 +101,13 @@ ACTIVE_CONTROL_STATUS_MAP: dict[str, str] = {
     "14": "auto_lan_wlan_local",
 }
 
+BYPASS_OPEN_VALUE = "3"
+
 BYPASS_VALVE_STATUS_MAP: dict[str, str] = {
     "0": "init",
     "1": "opening",
     "2": "closing",
-    "3": "open",
+    BYPASS_OPEN_VALUE: "open",
     "4": "closed",
 }
 

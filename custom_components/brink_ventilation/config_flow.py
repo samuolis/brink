@@ -423,8 +423,9 @@ class OptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             self._options_data.update(user_input)
             # Preserve internal flags not exposed in the options UI
-            if self.config_entry.options.get("adaptive_active", False):
-                self._options_data["adaptive_active"] = True
+            self._options_data["adaptive_active"] = self.config_entry.options.get(
+                "adaptive_active", False
+            )
             return self.async_create_entry(title="", data=self._options_data)
 
         opts = self.config_entry.options

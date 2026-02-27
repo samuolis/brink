@@ -212,9 +212,7 @@ class BrinkAutomationController:
         """
         _LOGGER.info("Automation deactivating from state %s", self._state)
 
-        if self._pending_task and not self._pending_task.done():
-            self._pending_task.cancel()
-        self._pending_task = None
+        self._cancel_pending_task()
         self._boost_pending = False
         self._cancel_boost_timer()
         self._cancel_countdown_timer()
@@ -367,9 +365,7 @@ class BrinkAutomationController:
 
     async def async_cleanup(self) -> None:
         """Cancel all timers, clear state."""
-        if self._pending_task and not self._pending_task.done():
-            self._pending_task.cancel()
-        self._pending_task = None
+        self._cancel_pending_task()
         self._boost_pending = False
         self._cancel_boost_timer()
         self._cancel_countdown_timer()
@@ -442,8 +438,7 @@ class BrinkAutomationController:
                 _LOGGER.info("Boost timer expired, transitioning to BASE")
                 self._state = AutomationState.BASE
 
-                if self._pending_task and not self._pending_task.done():
-                    self._pending_task.cancel()
+                self._cancel_pending_task()
                 self._pending_task = self._hass.async_create_task(
                     self._safe_apply_seasonal_level(boosted=False),
                     "brink_ventilation_boost_return_to_base",
@@ -541,8 +536,9 @@ class BrinkAutomationController:
                 old_time, old_value = self._humidity_previous[entity_id]
                 elapsed_minutes = (now - old_time) / 60.0
 
-                if elapsed_minutes > 0.0 and value != old_value:
+                if elapsed_minutes > 0.0 and abs(value - old_value) > 0.009:
                     rate = round((value - old_value) / elapsed_minutes, 1)
+                    rate = max(-50.0, min(50.0, rate))
                     self._humidity_rates[entity_id] = rate
 
                     # Track highest spike for boost trigger
@@ -576,12 +572,15 @@ class BrinkAutomationController:
                         threshold,
                     )
                     self._boost_pending = True
-                    if self._pending_task and not self._pending_task.done():
-                        self._pending_task.cancel()
-                    self._pending_task = self._hass.async_create_task(
-                        self._safe_activate_extra_ventilation(),
-                        "brink_ventilation_humidity_boost",
-                    )
+                    try:
+                        self._cancel_pending_task()
+                        self._pending_task = self._hass.async_create_task(
+                            self._safe_activate_extra_ventilation(),
+                            "brink_ventilation_humidity_boost",
+                        )
+                    except Exception:
+                        self._boost_pending = False
+                        _LOGGER.exception("Failed to create humidity boost task")
 
             # Trigger entity state update so delta sensors reflect new rates
             self._coordinator.async_set_updated_data(self._coordinator.data)
@@ -761,8 +760,14 @@ class BrinkAutomationController:
         return None, None
 
     # ------------------------------------------------------------------
-    # Timer cancellation helpers
+    # Timer and task cancellation helpers
     # ------------------------------------------------------------------
+
+    def _cancel_pending_task(self) -> None:
+        """Cancel the pending async task if running."""
+        if self._pending_task and not self._pending_task.done():
+            self._pending_task.cancel()
+        self._pending_task = None
 
     def _cancel_boost_timer(self) -> None:
         """Cancel the boost timer if active."""

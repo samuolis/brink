@@ -155,8 +155,6 @@ class BrinkHomeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
             await self.coordinator.client.write_parameters(
                 self._system_id, gateway_id, params
             )
-        except HomeAssistantError:
-            raise
         except (aiohttp.ClientError, asyncio.TimeoutError, BrinkAuthError) as ex:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,

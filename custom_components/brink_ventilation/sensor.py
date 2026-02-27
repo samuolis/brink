@@ -26,6 +26,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import BrinkConfigEntry
 from .const import (
     ACTIVE_CONTROL_STATUS_MAP,
+    BYPASS_OPEN_VALUE,
     BYPASS_VALVE_STATUS_MAP,
     CONF_HUMIDITY_SENSOR_1,
     CONF_HUMIDITY_SENSOR_2,
@@ -526,7 +527,7 @@ class BrinkHeatRecoveryEfficiencyEntity(BrinkHomeDeviceEntity, SensorEntity):
         bypass_param = self._get_param_any_component(PARAM_BYPASS_VALVE_STATUS)
         if bypass_param is not None:
             bypass_val = str(bypass_param.get("value", ""))
-            if bypass_val == "3":  # open
+            if bypass_val == BYPASS_OPEN_VALUE:
                 return 0.0
 
         # Division by zero guard

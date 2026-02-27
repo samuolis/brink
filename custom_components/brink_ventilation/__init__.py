@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import aiohttp
@@ -12,6 +13,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry
+
+_LOGGER = logging.getLogger(__name__)
 
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 from .coordinator import BrinkDataCoordinator
@@ -61,15 +64,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: BrinkConfigEntry) -> boo
     try:
         coordinator = BrinkDataCoordinator(hass, brink_client, entry)
         await coordinator.async_config_entry_first_refresh()
+
+        # Restore Adaptive (HA) mode if it was active before restart
+        await coordinator.automation_controller.async_restore_state()
+
+        # Start humidity monitoring (delta sensors) regardless of automation state
+        await coordinator.automation_controller.async_start_humidity_monitoring()
     except Exception:
         await brink_client.close()
         raise
-
-    # Restore Adaptive (HA) mode if it was active before restart
-    await coordinator.automation_controller.async_restore_state()
-
-    # Start humidity monitoring (delta sensors) regardless of automation state
-    await coordinator.automation_controller.async_start_humidity_monitoring()
 
     entry.runtime_data = BrinkRuntimeData(
         client=brink_client,
@@ -89,6 +92,7 @@ async def _async_update_listener(
     try:
         coordinator = entry.runtime_data.coordinator
     except AttributeError:
+        _LOGGER.debug("Coordinator not available, skipping options update")
         return
     new_interval = int(entry.options.get(
         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
