@@ -18,10 +18,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.aiohttp_client import (
-    async_create_clientsession,
-    async_get_clientsession,
-)
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
@@ -90,8 +87,9 @@ async def _async_test_credentials(
     Raises BrinkAuthError or aiohttp exceptions on failure.
     """
     session = async_get_clientsession(hass)
-    temp_old_session = async_create_clientsession(
-        hass, cookie_jar=aiohttp.CookieJar(unsafe=False)
+    # Create a standalone session (not HA-managed) so we can safely close it
+    temp_old_session = aiohttp.ClientSession(
+        cookie_jar=aiohttp.CookieJar(unsafe=False)
     )
     try:
         client = BrinkHomeCloud(session, temp_old_session, username, password)
@@ -261,10 +259,6 @@ class BrinkHomeConfigFlow(ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(OptionsFlow):
     """Handle an options flow for Brink-home."""
 
-    def __init__(self) -> None:
-        """Initialize options flow."""
-        self._options_data: dict[str, Any] = {}
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -278,8 +272,14 @@ class OptionsFlowHandler(OptionsFlow):
             if scan_interval < MIN_SCAN_INTERVAL or scan_interval > MAX_SCAN_INTERVAL:
                 errors["base"] = "scan_interval_out_of_range"
             else:
-                self._options_data.update(user_input)
-                return await self.async_step_extra_ventilation()
+                self._options_data = dict(user_input)
+                try:
+                    return await self.async_step_extra_ventilation()
+                except Exception:
+                    _LOGGER.exception(
+                        "Error transitioning to extra_ventilation step"
+                    )
+                    errors["base"] = "unknown"
 
         opts = user_input or self.config_entry.options
 
@@ -339,7 +339,10 @@ class OptionsFlowHandler(OptionsFlow):
         """Step 2: Extra ventilation settings."""
         if user_input is not None:
             self._options_data.update(user_input)
-            return await self.async_step_ha_automated()
+            return await self.async_step_adaptive()
+
+        if not hasattr(self, "_options_data"):
+            self._options_data = {}
 
         opts = self.config_entry.options
 
@@ -371,7 +374,6 @@ class OptionsFlowHandler(OptionsFlow):
                         SelectSelectorConfig(
                             options=["1", "2", "3"],
                             mode=SelectSelectorMode.DROPDOWN,
-                            translation_key=None,
                         )
                     ),
                     vol.Required(
@@ -384,25 +386,27 @@ class OptionsFlowHandler(OptionsFlow):
                         SelectSelectorConfig(
                             options=["1", "2", "3"],
                             mode=SelectSelectorMode.DROPDOWN,
-                            translation_key=None,
                         )
                     ),
                 }
             ),
         )
 
-    async def async_step_ha_automated(
+    async def async_step_adaptive(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Step 3: HA automated mode settings."""
+        """Step 3: Adaptive (HA) mode settings."""
         if user_input is not None:
             self._options_data.update(user_input)
+            # Preserve internal flags not exposed in the options UI
+            if self.config_entry.options.get("adaptive_active", False):
+                self._options_data["adaptive_active"] = True
             return self.async_create_entry(title="", data=self._options_data)
 
         opts = self.config_entry.options
 
         return self.async_show_form(
-            step_id="ha_automated",
+            step_id="adaptive",
             data_schema=vol.Schema(
                 {
                     vol.Required(
@@ -415,7 +419,6 @@ class OptionsFlowHandler(OptionsFlow):
                         SelectSelectorConfig(
                             options=["0", "1", "2", "3"],
                             mode=SelectSelectorMode.DROPDOWN,
-                            translation_key=None,
                         )
                     ),
                     vol.Required(
@@ -428,7 +431,6 @@ class OptionsFlowHandler(OptionsFlow):
                         SelectSelectorConfig(
                             options=["0", "1", "2", "3"],
                             mode=SelectSelectorMode.DROPDOWN,
-                            translation_key=None,
                         )
                     ),
                     vol.Optional(

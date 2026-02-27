@@ -51,7 +51,7 @@
     "step": {
       "init": {
         "title": "General Settings",
-        "description": "Configure general integration settings.",
+        "description": "Step 1 of 3: Configure general integration settings.",
         "data": {
           "scan_interval": "Scan interval",
           "freezing_threshold": "Freezing threshold",
@@ -65,7 +65,7 @@
       },
       "extra_ventilation": {
         "title": "Extra Ventilation",
-        "description": "Configure the extra ventilation boost feature.",
+        "description": "Step 2 of 3: Configure the extra ventilation boost. Can be triggered manually via the Extra Ventilation switch, or automatically by a humidity spike when Adaptive (HA) mode is active. Uses seasonal max levels and runs for the configured duration, then returns to the previous mode.",
         "data": {
           "extra_vent_duration": "Boost duration",
           "extra_vent_summer_level": "Summer max level",
@@ -77,9 +77,9 @@
           "extra_vent_winter_level": "Ventilation level during boost when outdoor temperature is below the freezing threshold. Lower levels reduce preheater electricity usage."
         }
       },
-      "ha_automated": {
-        "title": "HA Automated Mode",
-        "description": "Configure automatic ventilation control based on humidity sensors.",
+      "adaptive": {
+        "title": "Adaptive (HA) Mode",
+        "description": "Step 3 of 3: Configure adaptive ventilation control based on humidity sensors.",
         "data": {
           "auto_summer_base_level": "Summer base level",
           "auto_winter_base_level": "Winter base level",
@@ -100,7 +100,8 @@
     },
     "error": {
       "scan_interval_too_low": "Scan interval must be at least 15 seconds.",
-      "scan_interval_out_of_range": "Scan interval must be between 15 and 300 seconds."
+      "scan_interval_out_of_range": "Scan interval must be between 15 and 300 seconds.",
+      "unknown": "An unexpected error occurred."
     }
   },
   "entity": {
@@ -130,7 +131,7 @@
           "level_1": "Level 1",
           "level_2": "Level 2",
           "level_3": "Level 3",
-          "ha_automated": "HA Automated"
+          "adaptive": "Adaptive (HA)"
         }
       }
     },
@@ -217,11 +218,17 @@
           "winter": "Winter"
         }
       },
-      "humidity_delta": {
-        "name": "Humidity change (3 min)"
+      "humidity_delta_1": {
+        "name": "Humidity change sensor 1 (3 min)"
+      },
+      "humidity_delta_2": {
+        "name": "Humidity change sensor 2 (3 min)"
+      },
+      "humidity_delta_3": {
+        "name": "Humidity change sensor 3 (3 min)"
       }
     },
-    "button": {
+    "switch": {
       "extra_ventilation": {
         "name": "Extra ventilation"
       }

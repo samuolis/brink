@@ -139,6 +139,6 @@ VENTILATION_LEVEL_MAP: dict[str, str] = {
     "1": "level_1",
     "2": "level_2",
     "3": "level_3",
-    "4": "ha_automated",
+    "4": "adaptive",
 }
 VENTILATION_LEVEL_REVERSE: dict[str, str] = {v: k for k, v in VENTILATION_LEVEL_MAP.items()}

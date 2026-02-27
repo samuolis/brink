@@ -24,7 +24,7 @@
     "step": {
       "init": {
         "title": "Allgemeine Einstellungen",
-        "description": "Allgemeine Integrationseinstellungen konfigurieren.",
+        "description": "Schritt 1 von 3: Allgemeine Integrationseinstellungen konfigurieren.",
         "data": {
           "scan_interval": "Abfrageintervall",
           "freezing_threshold": "Frostgrenze",
@@ -38,7 +38,7 @@
       },
       "extra_ventilation": {
         "title": "Zus\u00e4tzl\u00fcftung",
-        "description": "Zusatzl\u00fcftungs-Boost konfigurieren.",
+        "description": "Schritt 2 von 3: Zusatzl\u00fcftungs-Boost konfigurieren. Kann manuell \u00fcber den Zusatzl\u00fcftungs-Schalter oder automatisch durch einen Feuchtigkeitsanstieg im Adaptiv (HA) Modus ausgel\u00f6st werden. Verwendet saisonale Maximalstufen und l\u00e4uft f\u00fcr die konfigurierte Dauer, dann R\u00fcckkehr zum vorherigen Modus.",
         "data": {
           "extra_vent_duration": "Boost-Dauer",
           "extra_vent_summer_level": "Sommer-Maximalstufe",
@@ -50,9 +50,9 @@
           "extra_vent_winter_level": "L\u00fcftungsstufe w\u00e4hrend des Boosts, wenn die Au\u00dfentemperatur unter der Frostgrenze liegt. Niedrigere Stufen reduzieren den Vorheizer-Stromverbrauch."
         }
       },
-      "ha_automated": {
-        "title": "HA Automatik-Modus",
-        "description": "Automatische L\u00fcftungssteuerung basierend auf Feuchtigkeitssensoren konfigurieren.",
+      "adaptive": {
+        "title": "Adaptiv (HA) Modus",
+        "description": "Schritt 3 von 3: Adaptive L\u00fcftungssteuerung basierend auf Feuchtigkeitssensoren konfigurieren.",
         "data": {
           "auto_summer_base_level": "Sommer-Basisstufe",
           "auto_winter_base_level": "Winter-Basisstufe",
@@ -73,7 +73,8 @@
     },
     "error": {
       "scan_interval_too_low": "Das Abfrageintervall muss mindestens 15 Sekunden betragen.",
-      "scan_interval_out_of_range": "Das Abfrageintervall muss zwischen 15 und 300 Sekunden liegen."
+      "scan_interval_out_of_range": "Das Abfrageintervall muss zwischen 15 und 300 Sekunden liegen.",
+      "unknown": "Ein unerwarteter Fehler ist aufgetreten."
     }
   },
   "entity": {
@@ -103,7 +104,7 @@
           "level_1": "Stufe 1",
           "level_2": "Stufe 2",
           "level_3": "Stufe 3",
-          "ha_automated": "HA Automatisch"
+          "adaptive": "Adaptiv (HA)"
         }
       }
     },
@@ -190,11 +191,17 @@
           "winter": "Winter"
         }
       },
-      "humidity_delta": {
-        "name": "Luftfeuchtigkeitsänderung (3 Min.)"
+      "humidity_delta_1": {
+        "name": "Feuchtigkeitsänderung Sensor 1 (3 Min.)"
+      },
+      "humidity_delta_2": {
+        "name": "Feuchtigkeitsänderung Sensor 2 (3 Min.)"
+      },
+      "humidity_delta_3": {
+        "name": "Feuchtigkeitsänderung Sensor 3 (3 Min.)"
       }
     },
-    "button": {
+    "switch": {
       "extra_ventilation": {
         "name": "Zusatzl\u00fcftung"
       }

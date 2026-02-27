@@ -17,11 +17,11 @@
       "ventilation_level": {
         "default": "mdi:fan",
         "state": {
-          "ha_automated": "mdi:home-automation"
+          "adaptive": "mdi:auto-fix"
         }
       }
     },
-    "button": {
+    "switch": {
       "extra_ventilation": {
         "default": "mdi:fan-plus"
       }
@@ -92,7 +92,13 @@
           "winter": "mdi:snowflake"
         }
       },
-      "humidity_delta": {
+      "humidity_delta_1": {
+        "default": "mdi:water-percent-alert"
+      },
+      "humidity_delta_2": {
+        "default": "mdi:water-percent-alert"
+      },
+      "humidity_delta_3": {
         "default": "mdi:water-percent-alert"
       }
     },

@@ -22,9 +22,9 @@ from .core.brink_home_cloud import BrinkAuthError, BrinkHomeCloud
 
 PLATFORMS = [
     Platform.BINARY_SENSOR,
-    Platform.BUTTON,
     Platform.SELECT,
     Platform.SENSOR,
+    Platform.SWITCH,
 ]
 
 
@@ -64,8 +64,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: BrinkConfigEntry) -> boo
     coordinator = BrinkDataCoordinator(hass, brink_client, entry)
     await coordinator.async_config_entry_first_refresh()
 
-    # Restore HA automated mode if it was active before restart
+    # Restore Adaptive (HA) mode if it was active before restart
     await coordinator.automation_controller.async_restore_state()
+
+    # Start humidity monitoring (delta sensors) regardless of automation state
+    await coordinator.automation_controller.async_start_humidity_monitoring()
 
     entry.runtime_data = BrinkRuntimeData(
         client=brink_client,

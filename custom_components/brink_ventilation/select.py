@@ -222,7 +222,7 @@ class BrinkHomeVentilationLevelSelectEntity(BrinkHomeSelectEntity):
         """Return the current option."""
         controller = self.coordinator.automation_controller
         if controller.state != AutomationState.IDLE:
-            return "ha_automated"
+            return "adaptive"
         # Fall back to normal API-based value
         param = self._param
         if param is None:
@@ -263,11 +263,11 @@ class BrinkHomeVentilationLevelSelectEntity(BrinkHomeSelectEntity):
         """Set the ventilation level, switching to Manual mode first."""
         controller = self.coordinator.automation_controller
 
-        if option == "ha_automated":
+        if option == "adaptive":
             await controller.async_activate()
             return
 
-        # If switching away from ha_automated, deactivate controller
+        # If switching away from adaptive mode, deactivate controller
         if controller.state != AutomationState.IDLE:
             await controller.async_deactivate()
 

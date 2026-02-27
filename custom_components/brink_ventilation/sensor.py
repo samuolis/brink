@@ -27,6 +27,9 @@ from . import BrinkConfigEntry
 from .const import (
     ACTIVE_CONTROL_STATUS_MAP,
     BYPASS_VALVE_STATUS_MAP,
+    CONF_HUMIDITY_SENSOR_1,
+    CONF_HUMIDITY_SENSOR_2,
+    CONF_HUMIDITY_SENSOR_3,
     DOMAIN,
     PARAM_ACTIVE_CONTROL_STATUS,
     PARAM_BYPASS_VALVE_STATUS,
@@ -235,7 +238,13 @@ async def async_setup_entry(
             entities.append(
                 BrinkCurrentSeasonEntity(coordinator, system_id)
             )
-            entities.append(BrinkHumidityDeltaEntity(coordinator, system_id))
+
+            # Always create all 3 humidity delta slots — they dynamically
+            # read their source sensor from options, no restart needed.
+            for sensor_num in (1, 2, 3):
+                entities.append(
+                    BrinkHumidityDeltaEntity(coordinator, system_id, sensor_num)
+                )
 
         if entities:
             _LOGGER.debug("Adding %s sensor entities", len(entities))
@@ -359,10 +368,21 @@ class BrinkCurrentSeasonEntity(BrinkHomeDeviceEntity, SensorEntity):
         return self.coordinator.automation_controller.season
 
 
-class BrinkHumidityDeltaEntity(BrinkHomeDeviceEntity, SensorEntity):
-    """Sensor showing the maximum humidity change across monitored sensors."""
+_HUMIDITY_CONF_KEYS = {
+    1: CONF_HUMIDITY_SENSOR_1,
+    2: CONF_HUMIDITY_SENSOR_2,
+    3: CONF_HUMIDITY_SENSOR_3,
+}
 
-    _attr_translation_key = "humidity_delta"
+
+class BrinkHumidityDeltaEntity(BrinkHomeDeviceEntity, SensorEntity):
+    """Sensor showing the humidity change for a specific monitored sensor.
+
+    Always created for slots 1-3. Dynamically reads the assigned source
+    sensor from options so no restart is needed when sensors change.
+    Shows unavailable when no sensor is assigned to this slot.
+    """
+
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -371,21 +391,41 @@ class BrinkHumidityDeltaEntity(BrinkHomeDeviceEntity, SensorEntity):
         self,
         coordinator: BrinkDataCoordinator,
         system_id: int,
+        sensor_num: int,
     ) -> None:
         """Initialize the humidity delta sensor."""
-        super().__init__(coordinator, system_id, PARAM_VENTILATION_LEVEL, "humidity_delta")
+        self._sensor_num = sensor_num
+        self._conf_key = _HUMIDITY_CONF_KEYS[sensor_num]
+        self._attr_translation_key = f"humidity_delta_{sensor_num}"
+        super().__init__(
+            coordinator, system_id, PARAM_VENTILATION_LEVEL,
+            f"humidity_delta_{sensor_num}",
+        )
+
+    @property
+    def _source_entity_id(self) -> str:
+        """Return the currently configured source sensor entity_id."""
+        return self.coordinator.config_entry.options.get(self._conf_key, "")
 
     @property
     def unique_id(self) -> str:
         """Return a unique ID for this entity."""
-        return f"{DOMAIN}_{self._system_id}_humidity_delta"
+        return f"{DOMAIN}_{self._system_id}_humidity_delta_{self._sensor_num}"
 
     @property
     def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self._device is not None
+        """Return True if a sensor is assigned and coordinator is healthy."""
+        return (
+            bool(self._source_entity_id)
+            and self.coordinator.last_update_success
+            and self._device is not None
+        )
 
     @property
-    def native_value(self) -> float:
-        """Return the maximum humidity delta across all monitored sensors."""
-        return self.coordinator.automation_controller.max_humidity_delta
+    def native_value(self) -> float | None:
+        """Return the humidity delta for this sensor."""
+        source = self._source_entity_id
+        if not source:
+            return None
+        deltas = self.coordinator.automation_controller.humidity_deltas
+        return deltas.get(source, 0.0)

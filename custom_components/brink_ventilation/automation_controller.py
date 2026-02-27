@@ -69,10 +69,10 @@ class BrinkAutomationController:
     """Manages seasonal ventilation, humidity-spike boost, and write retries.
 
     State machine:
-        IDLE  --(ha_automated selected)-->  BASE
+        IDLE  --(adaptive selected)-->  BASE
         BASE  --(humidity spike / button)-->  BOOSTED
         BOOSTED  --(timer expires)-->  BASE
-        BASE / BOOSTED  --(ha_automated deselected)-->  IDLE
+        BASE / BOOSTED  --(adaptive deselected)-->  IDLE
     """
 
     def __init__(
@@ -174,6 +174,14 @@ class BrinkAutomationController:
     # Public methods
     # ------------------------------------------------------------------
 
+    async def async_start_humidity_monitoring(self) -> None:
+        """Start humidity listeners for delta tracking, independent of automation state.
+
+        Called during setup so the humidity delta sensors always have data,
+        even when Adaptive (HA) mode is not active.
+        """
+        self._start_humidity_listeners()
+
     async def async_activate(self) -> None:
         """Transition IDLE -> BASE: start seasonal ventilation and humidity monitoring."""
         if self._state != AutomationState.IDLE:
@@ -185,12 +193,13 @@ class BrinkAutomationController:
         self._season = self._evaluate_season()
         self._state = AutomationState.BASE
 
+        # Ensure humidity listeners are running (may already be from monitoring)
         self._start_humidity_listeners()
 
-        # Persist ha_automated active flag for startup recovery
+        # Persist adaptive mode active flag for startup recovery
         self._hass.config_entries.async_update_entry(
             self._entry,
-            options={**self._entry.options, "ha_automated_active": True},
+            options={**self._entry.options, "adaptive_active": True},
         )
 
         base_level = self._get_seasonal_base_level()
@@ -205,23 +214,27 @@ class BrinkAutomationController:
         )
 
     async def async_deactivate(self) -> None:
-        """Transition any state -> IDLE: cancel all timers and listeners."""
+        """Transition any state -> IDLE: cancel timers but keep humidity monitoring.
+
+        Humidity listeners remain active so the delta sensors continue to
+        show data even when Adaptive (HA) mode is not active.
+        """
         _LOGGER.info("Automation deactivating from state %s", self._state)
 
         self._cancel_boost_timer()
         self._cancel_countdown_timer()
-        self._remove_humidity_listeners()
-        self._humidity_windows.clear()
         self._pending_writes = None
         self._was_in_base_before_boost = False
         self._boost_end_monotonic = 0.0
         self._state = AutomationState.IDLE
 
-        # Clear ha_automated active flag
-        if self._entry.options.get("ha_automated_active", False):
+        # Clear adaptive mode active flag
+        new_opts = {**self._entry.options, "adaptive_active": False}
+        new_opts.pop("ha_automated_active", None)  # migrate old key
+        if self._entry.options.get("adaptive_active", False) or self._entry.options.get("ha_automated_active", False):
             self._hass.config_entries.async_update_entry(
                 self._entry,
-                options={**self._entry.options, "ha_automated_active": False},
+                options=new_opts,
             )
 
     async def async_activate_extra_ventilation(self) -> None:
@@ -257,6 +270,9 @@ class BrinkAutomationController:
         self._start_countdown_timer()
         self._state = AutomationState.BOOSTED
 
+        # Trigger immediate entity update so switch/sensor reflect new state
+        self._coordinator.async_set_updated_data(self._coordinator.data)
+
         _LOGGER.info(
             "Extra ventilation activated: season=%s, max_level=%s, duration=%d min",
             self._season,
@@ -264,13 +280,48 @@ class BrinkAutomationController:
             duration_minutes,
         )
 
-    async def async_on_coordinator_update(self) -> None:
-        """Handle coordinator data refresh: re-evaluate season and retry writes."""
-        if self._state == AutomationState.IDLE:
+    async def async_cancel_extra_ventilation(self) -> None:
+        """Cancel an active extra ventilation boost.
+
+        Returns to BASE if adaptive mode was active before the boost,
+        otherwise returns to IDLE.
+        """
+        if self._state != AutomationState.BOOSTED:
             return
 
+        self._cancel_boost_timer()
+        self._cancel_countdown_timer()
+
+        if self._was_in_base_before_boost:
+            _LOGGER.info("Extra ventilation cancelled, returning to BASE")
+            self._state = AutomationState.BASE
+            self._season = self._evaluate_season()
+
+            base_level = self._get_seasonal_base_level()
+            params = self._build_mode_and_level_params(
+                mode_value="1", level_value=str(base_level)
+            )
+            if params:
+                await self.async_write_params(params)
+        else:
+            _LOGGER.info("Extra ventilation cancelled, returning to IDLE")
+            self._state = AutomationState.IDLE
+
+        # Trigger immediate entity update so switch/sensor reflect new state
+        self._coordinator.async_set_updated_data(self._coordinator.data)
+
+    async def async_on_coordinator_update(self) -> None:
+        """Handle coordinator data refresh: re-evaluate season and retry writes.
+
+        Season is always evaluated (so the season sensor works regardless of
+        automation state), but ventilation level changes only happen when
+        Adaptive (HA) mode is active (BASE or BOOSTED).
+        """
         old_season = self._season
         self._season = self._evaluate_season()
+
+        if self._state == AutomationState.IDLE:
+            return
 
         if old_season != self._season and self._season is not None:
             _LOGGER.info("Season changed: %s -> %s", old_season, self._season)
@@ -294,24 +345,36 @@ class BrinkAutomationController:
     async def async_restore_state(self) -> None:
         """Restore automation state after HA restart.
 
-        Checks entry.options for a stored ha_automated_active flag. If the
-        automation was active before HA restarted, re-activate it.
+        Checks entry.options for the adaptive_active flag. Also migrates the
+        old ha_automated_active key for backward compatibility.
         """
-        if self._entry.options.get("ha_automated_active", False):
-            _LOGGER.info("Restoring ha_automated state after restart")
+        active = self._entry.options.get(
+            "adaptive_active",
+            self._entry.options.get("ha_automated_active", False),
+        )
+        if active:
+            _LOGGER.info("Restoring adaptive mode state after restart")
+            # Migrate old key if present
+            if "ha_automated_active" in self._entry.options:
+                new_opts = {**self._entry.options, "adaptive_active": True}
+                new_opts.pop("ha_automated_active", None)
+                self._hass.config_entries.async_update_entry(
+                    self._entry, options=new_opts
+                )
             # Reset state to IDLE so async_activate can transition properly
             self._state = AutomationState.IDLE
             await self.async_activate()
 
     async def async_options_updated(self) -> None:
         """Handle options flow update: re-subscribe listeners and re-evaluate season."""
-        if self._state == AutomationState.IDLE:
-            return
-
-        # Re-subscribe humidity listeners (sensors may have changed)
+        # Always re-subscribe humidity listeners (sensors may have changed)
+        # This ensures delta sensors work even when not in Adaptive (HA) mode
         self._remove_humidity_listeners()
         self._humidity_windows.clear()
         self._start_humidity_listeners()
+
+        if self._state == AutomationState.IDLE:
+            return
 
         # Re-evaluate season with potentially new threshold
         old_season = self._season
@@ -419,9 +482,12 @@ class BrinkAutomationController:
             else:
                 _LOGGER.info(
                     "Boost timer expired, transitioning to IDLE "
-                    "(boost was triggered outside ha_automated mode)"
+                    "(boost was triggered outside adaptive mode)"
                 )
                 self._state = AutomationState.IDLE
+
+            # Trigger immediate entity update so switch/sensor reflect new state
+            self._coordinator.async_set_updated_data(self._coordinator.data)
         else:
             _LOGGER.debug("Boost timer expired but state is %s", self._state)
 
@@ -483,10 +549,11 @@ class BrinkAutomationController:
 
     @callback
     def _async_humidity_state_changed(self, event: Event) -> None:
-        """Handle humidity sensor state changes for spike detection."""
-        if self._state != AutomationState.BASE:
-            return
+        """Handle humidity sensor state changes.
 
+        Always tracks rolling window data (for delta sensors), but only
+        triggers boost when in BASE state (spike detection).
+        """
         entity_id: str = event.data.get("entity_id", "")
         new_state = event.data.get("new_state")
         if new_state is None:
@@ -528,8 +595,8 @@ class BrinkAutomationController:
         while window and window[0][0] < cutoff:
             window.popleft()
 
-        # Spike detection
-        if len(window) >= 2:
+        # Spike detection — only trigger boost when in BASE state
+        if self._state == AutomationState.BASE and len(window) >= 2:
             threshold: float = float(
                 self._entry.options.get(
                     CONF_HUMIDITY_SPIKE_THRESHOLD, DEFAULT_HUMIDITY_SPIKE_THRESHOLD
