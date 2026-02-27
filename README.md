@@ -113,8 +113,8 @@ After setup, configure the integration options:
 
 | Option | Default | Range | Description |
 |---|---|---|---|
-| Scan interval | 60 | 15–300 seconds | How often to poll the Brink Home API |
-| Freezing threshold | -2 | -10 to +10 °C | Temperature below which winter mode activates |
+| Scan interval | 60 | 30–300 seconds | How often to poll the Brink Home API |
+| Freezing threshold | -2 | -10 to +10 °C | Temperature below which winter mode activates. Winter mode reduces ventilation levels to lower preheater electricity usage during freezing conditions. |
 | Temperature source | _(Brink sensor)_ | Entity selector | Optional: outdoor temperature override for season detection. If empty, uses the Brink unit's fresh air temperature sensor. |
 | Indoor temperature sensor 1 | _(empty)_ | Entity selector | Optional: indoor temperature sensor for heat recovery efficiency calculation |
 | Indoor temperature sensor 2 | _(empty)_ | Entity selector | Optional: second indoor temperature sensor. If both are configured, their values are averaged. |
@@ -156,6 +156,21 @@ The **Extra ventilation** switch activates a timed ventilation boost. When turne
 
 The winter/summer split exists because Brink ventilation units have a preheater that prevents freezing of the heat exchanger. At high flow rates in freezing conditions, the preheater uses significant electricity. Setting a lower max level in winter avoids this.
 
+## Recommended Ventilation Level Setup
+
+For optimal use of this integration, configure the built-in ventilation levels on your Brink unit to match these purposes:
+
+| Level | Recommended use | Example |
+|---|---|---|
+| Level 3 | Maximum boost — the highest airflow you want during summer extra ventilation (e.g., shower boost) | 325 m³/h |
+| Level 2 | Normal summer — comfortable everyday ventilation when it's warm outside | 200 m³/h |
+| Level 1 | Normal winter — reduced airflow to limit preheater electricity usage during freezing conditions | 150 m³/h |
+| Level 0 | Minimum — away mode or very low ventilation when the house is unoccupied | 50 m³/h |
+
+With this setup, the integration's Adaptive (HA) mode and Extra Ventilation boost will automatically select the right level for the season without further tuning. The default option values are designed around this level assignment.
+
+You can configure the actual airflow (m³/h) for each level through the Brink unit's installer menu or the Brink Home portal.
+
 ## Adaptive (HA) Mode
 
 Select **Adaptive (HA)** in the ventilation level control to enable automatic humidity-responsive ventilation:
@@ -184,7 +199,7 @@ If the internet connection is lost when a ventilation level change is needed:
 
 This is a **cloud polling** integration. It periodically fetches data from the Brink Home API.
 
-- **Default polling interval**: 60 seconds (configurable in integration options, minimum 15 seconds).
+- **Default polling interval**: 60 seconds (configurable in integration options, minimum 30 seconds).
 - **Expedited polling**: After a write command (changing mode, ventilation level, or bypass), the polling interval is temporarily reduced to 15 seconds for 3 minutes so that changes are reflected quickly.
 - **Authentication**: Uses OIDC with PKCE (OAuth 2.0) for secure authentication with the Brink Home portal.
 - **Coordinator pattern**: Uses Home Assistant's `DataUpdateCoordinator` so all entities share a single polling cycle, minimizing API calls.
@@ -265,21 +280,6 @@ automation:
           entity_id: select.brink_ventilation_XXXX_ventilation_level
         data:
           option: "Level 3"
-```
-
-### Boost ventilation when bathroom humidity is high
-
-```yaml
-automation:
-  - alias: "Boost ventilation on high humidity"
-    trigger:
-      - platform: numeric_state
-        entity_id: sensor.bathroom_humidity
-        above: 70
-    action:
-      - service: switch.turn_on
-        target:
-          entity_id: switch.brink_ventilation_XXXX_extra_ventilation
 ```
 
 ### Night mode on a schedule
