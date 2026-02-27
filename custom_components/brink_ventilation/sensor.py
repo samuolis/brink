@@ -30,6 +30,8 @@ from .const import (
     CONF_HUMIDITY_SENSOR_1,
     CONF_HUMIDITY_SENSOR_2,
     CONF_HUMIDITY_SENSOR_3,
+    CONF_INDOOR_TEMPERATURE_ENTITY_1,
+    CONF_INDOOR_TEMPERATURE_ENTITY_2,
     DOMAIN,
     PARAM_ACTIVE_CONTROL_STATUS,
     PARAM_BYPASS_VALVE_STATUS,
@@ -246,6 +248,10 @@ async def async_setup_entry(
                     BrinkHumidityDeltaEntity(coordinator, system_id, sensor_num)
                 )
 
+            entities.append(
+                BrinkHeatRecoveryEfficiencyEntity(coordinator, system_id)
+            )
+
         if entities:
             _LOGGER.debug("Adding %s sensor entities", len(entities))
             async_add_entities(entities)
@@ -429,3 +435,103 @@ class BrinkHumidityDeltaEntity(BrinkHomeDeviceEntity, SensorEntity):
             return None
         deltas = self.coordinator.automation_controller.humidity_deltas
         return deltas.get(source, 0.0)
+
+
+class BrinkHeatRecoveryEfficiencyEntity(BrinkHomeDeviceEntity, SensorEntity):
+    """Sensor showing heat recovery efficiency (0-100%).
+
+    Computes: (T_supply - T_fresh) / (T_indoor - T_fresh) * 100
+    where T_indoor comes from 1-2 configured HA temperature sensors (averaged).
+    """
+
+    _attr_translation_key = "heat_recovery_efficiency"
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    def __init__(
+        self,
+        coordinator: BrinkDataCoordinator,
+        system_id: int,
+    ) -> None:
+        """Initialize the heat recovery efficiency sensor."""
+        super().__init__(
+            coordinator, system_id, PARAM_SUPPLY_TEMP, "heat_recovery_efficiency",
+        )
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID for this entity."""
+        return f"{DOMAIN}_{self._system_id}_heat_recovery_efficiency"
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        if not self.coordinator.last_update_success or self._device is None:
+            return False
+        opts = self.coordinator.config_entry.options
+        return bool(
+            opts.get(CONF_INDOOR_TEMPERATURE_ENTITY_1)
+            or opts.get(CONF_INDOOR_TEMPERATURE_ENTITY_2)
+        )
+
+    def _get_indoor_temperature(self) -> float | None:
+        """Get indoor temperature from configured HA entities (averaged if two)."""
+        opts = self.coordinator.config_entry.options
+        values: list[float] = []
+
+        for key in (CONF_INDOOR_TEMPERATURE_ENTITY_1, CONF_INDOOR_TEMPERATURE_ENTITY_2):
+            entity_id = opts.get(key, "")
+            if not entity_id:
+                continue
+            state = self.hass.states.get(entity_id)
+            if state is None or state.state in (None, "unavailable", "unknown"):
+                continue
+            try:
+                values.append(float(state.state))
+            except (ValueError, TypeError):
+                continue
+
+        if not values:
+            return None
+        return sum(values) / len(values)
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the heat recovery efficiency percentage."""
+        t_indoor = self._get_indoor_temperature()
+        if t_indoor is None:
+            return None
+
+        # Get T_fresh from coordinator data
+        fresh_param = self._get_param_any_component(PARAM_FRESH_AIR_TEMP)
+        if fresh_param is None:
+            return None
+        try:
+            t_fresh = float(fresh_param.get("value"))
+        except (ValueError, TypeError):
+            return None
+
+        # Get T_supply from coordinator data
+        supply_param = self._get_param_any_component(PARAM_SUPPLY_TEMP)
+        if supply_param is None:
+            return None
+        try:
+            t_supply = float(supply_param.get("value"))
+        except (ValueError, TypeError):
+            return None
+
+        # Check bypass valve status — if open, no heat recovery
+        bypass_param = self._get_param_any_component(PARAM_BYPASS_VALVE_STATUS)
+        if bypass_param is not None:
+            bypass_val = str(bypass_param.get("value", ""))
+            if bypass_val == "3":  # open
+                return 0.0
+
+        # Division by zero guard
+        delta = t_indoor - t_fresh
+        if abs(delta) < 0.1:
+            return 0.0
+
+        efficiency = (t_supply - t_fresh) / delta * 100.0
+        return round(max(0.0, min(100.0, efficiency)), 1)

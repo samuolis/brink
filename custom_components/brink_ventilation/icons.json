@@ -100,6 +100,9 @@
       },
       "humidity_delta_3": {
         "default": "mdi:water-percent-alert"
+      },
+      "heat_recovery_efficiency": {
+        "default": "mdi:heat-wave"
       }
     },
     "binary_sensor": {

@@ -23,6 +23,8 @@ CONF_HUMIDITY_SENSOR_1 = "humidity_sensor_1"
 CONF_HUMIDITY_SENSOR_2 = "humidity_sensor_2"
 CONF_HUMIDITY_SENSOR_3 = "humidity_sensor_3"
 CONF_HUMIDITY_SPIKE_THRESHOLD = "humidity_spike_threshold"
+CONF_INDOOR_TEMPERATURE_ENTITY_1 = "indoor_temperature_entity_1"
+CONF_INDOOR_TEMPERATURE_ENTITY_2 = "indoor_temperature_entity_2"
 
 # Defaults for new options
 DEFAULT_FREEZING_THRESHOLD = -2.0

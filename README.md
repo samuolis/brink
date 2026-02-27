@@ -48,6 +48,7 @@ The integration exposes up to 20 parameters from the Brink Home API as Home Assi
 | Humidity rate sensor 1 (%/min) | %/min | Humidity rate of change for monitored sensor 1, calculated over a 3-minute rolling window. Shows unavailable when no sensor is assigned. | Enabled |
 | Humidity rate sensor 2 (%/min) | %/min | Humidity rate of change for monitored sensor 2, calculated over a 3-minute rolling window. Shows unavailable when no sensor is assigned. | Enabled |
 | Humidity rate sensor 3 (%/min) | %/min | Humidity rate of change for monitored sensor 3, calculated over a 3-minute rolling window. Shows unavailable when no sensor is assigned. | Enabled |
+| Heat recovery efficiency | % | Heat exchanger efficiency calculated from supply, fresh air, and indoor temperatures. Shows 0% when bypass is open or temperatures are equal. Requires at least one indoor temperature sensor configured. | Enabled |
 
 ### Select Controls
 
@@ -114,7 +115,9 @@ After setup, configure the integration options:
 |---|---|---|---|
 | Scan interval | 60 | 15–300 seconds | How often to poll the Brink Home API |
 | Freezing threshold | -2 | -10 to +10 °C | Temperature below which winter mode activates |
-| Temperature source | _(Brink sensor)_ | Entity selector | Optional: override with any HA temperature sensor |
+| Temperature source | _(Brink sensor)_ | Entity selector | Optional: outdoor temperature override for season detection. If empty, uses the Brink unit's fresh air temperature sensor. |
+| Indoor temperature sensor 1 | _(empty)_ | Entity selector | Optional: indoor temperature sensor for heat recovery efficiency calculation |
+| Indoor temperature sensor 2 | _(empty)_ | Entity selector | Optional: second indoor temperature sensor. If both are configured, their values are averaged. |
 
 #### Extra Ventilation
 

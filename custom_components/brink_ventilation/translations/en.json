@@ -55,12 +55,16 @@
         "data": {
           "scan_interval": "Scan interval",
           "freezing_threshold": "Freezing threshold",
-          "temperature_source_entity": "Temperature source"
+          "temperature_source_entity": "Temperature source",
+          "indoor_temperature_entity_1": "Indoor temperature sensor 1",
+          "indoor_temperature_entity_2": "Indoor temperature sensor 2"
         },
         "data_description": {
           "scan_interval": "How often (in seconds) to poll the Brink Home API for updates.",
           "freezing_threshold": "Temperature (\u00b0C) below which winter mode activates. Affects ventilation levels to reduce preheater electricity usage.",
-          "temperature_source_entity": "Optional: select a temperature sensor entity. If empty, the Brink unit's fresh air temperature sensor is used."
+          "temperature_source_entity": "Optional: select a temperature sensor entity. If empty, the Brink unit's fresh air temperature sensor is used.",
+          "indoor_temperature_entity_1": "Optional: select an indoor temperature sensor for heat recovery efficiency calculation.",
+          "indoor_temperature_entity_2": "Optional: second indoor temperature sensor. If both are configured, their values are averaged."
         }
       },
       "extra_ventilation": {
@@ -226,6 +230,9 @@
       },
       "humidity_delta_3": {
         "name": "Humidity rate sensor 3 (%/min)"
+      },
+      "heat_recovery_efficiency": {
+        "name": "Heat recovery efficiency"
       }
     },
     "switch": {

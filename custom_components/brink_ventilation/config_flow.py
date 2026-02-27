@@ -44,6 +44,8 @@ from .const import (
     CONF_HUMIDITY_SENSOR_2,
     CONF_HUMIDITY_SENSOR_3,
     CONF_HUMIDITY_SPIKE_THRESHOLD,
+    CONF_INDOOR_TEMPERATURE_ENTITY_1,
+    CONF_INDOOR_TEMPERATURE_ENTITY_2,
     CONF_TEMPERATURE_SOURCE_ENTITY,
     DEFAULT_AUTO_SUMMER_BASE_LEVEL,
     DEFAULT_AUTO_WINTER_BASE_LEVEL,
@@ -316,6 +318,32 @@ class OptionsFlowHandler(OptionsFlow):
                         description={
                             "suggested_value": opts.get(
                                 CONF_TEMPERATURE_SOURCE_ENTITY
+                            )
+                        },
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="temperature",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_INDOOR_TEMPERATURE_ENTITY_1,
+                        description={
+                            "suggested_value": opts.get(
+                                CONF_INDOOR_TEMPERATURE_ENTITY_1
+                            )
+                        },
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="temperature",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_INDOOR_TEMPERATURE_ENTITY_2,
+                        description={
+                            "suggested_value": opts.get(
+                                CONF_INDOOR_TEMPERATURE_ENTITY_2
                             )
                         },
                     ): EntitySelector(

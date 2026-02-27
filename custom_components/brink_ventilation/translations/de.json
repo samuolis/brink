@@ -28,12 +28,16 @@
         "data": {
           "scan_interval": "Abfrageintervall",
           "freezing_threshold": "Frostgrenze",
-          "temperature_source_entity": "Temperaturquelle"
+          "temperature_source_entity": "Temperaturquelle",
+          "indoor_temperature_entity_1": "Innentemperatursensor 1",
+          "indoor_temperature_entity_2": "Innentemperatursensor 2"
         },
         "data_description": {
           "scan_interval": "Wie oft (in Sekunden) die Brink Home API nach Updates abgefragt wird.",
           "freezing_threshold": "Temperatur (\u00b0C), unterhalb derer der Wintermodus aktiviert wird. Beeinflusst L\u00fcftungsstufen zur Reduzierung des Vorheizer-Stromverbrauchs.",
-          "temperature_source_entity": "Optional: W\u00e4hlen Sie einen Temperatursensor. Wenn leer, wird der Au\u00dfenluft-Temperatursensor des Brink-Ger\u00e4ts verwendet."
+          "temperature_source_entity": "Optional: W\u00e4hlen Sie einen Temperatursensor. Wenn leer, wird der Au\u00dfenluft-Temperatursensor des Brink-Ger\u00e4ts verwendet.",
+          "indoor_temperature_entity_1": "Optional: W\u00e4hlen Sie einen Innentemperatursensor f\u00fcr die Berechnung der W\u00e4rmer\u00fcckgewinnungseffizienz.",
+          "indoor_temperature_entity_2": "Optional: Zweiter Innentemperatursensor. Wenn beide konfiguriert sind, werden die Werte gemittelt."
         }
       },
       "extra_ventilation": {
@@ -199,6 +203,9 @@
       },
       "humidity_delta_3": {
         "name": "Feuchtigkeitsrate Sensor 3 (%/min)"
+      },
+      "heat_recovery_efficiency": {
+        "name": "W\u00e4rmer\u00fcckgewinnungseffizienz"
       }
     },
     "switch": {
