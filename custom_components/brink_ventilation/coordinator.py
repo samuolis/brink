@@ -24,7 +24,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     EXPEDITED_DURATION,
-    MIN_SCAN_INTERVAL,
+    EXPEDITED_INTERVAL,
 )
 from .automation_controller import BrinkAutomationController
 from .core.brink_home_cloud import BrinkAuthError, BrinkHomeCloud
@@ -187,10 +187,10 @@ class BrinkDataCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
         if self._expedited_normal_interval is None:
             self._expedited_normal_interval = self.update_interval
 
-        self.update_interval = timedelta(seconds=MIN_SCAN_INTERVAL)
+        self.update_interval = timedelta(seconds=EXPEDITED_INTERVAL)
         _LOGGER.debug(
             "Expedited polling started (every %ss for %ss)",
-            MIN_SCAN_INTERVAL,
+            EXPEDITED_INTERVAL,
             EXPEDITED_DURATION,
         )
 

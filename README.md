@@ -68,7 +68,7 @@ The integration exposes up to 20 parameters from the Brink Home API as Home Assi
 
 | Entity | Description |
 |---|---|
-| Extra ventilation | Toggle switch for timed ventilation boost at the seasonal max level. ON = boost active, OFF = cancel boost. |
+| Extra ventilation | Toggle switch for timed ventilation boost at the seasonal max level. ON = boost active, OFF = cancel boost. When triggered by a humidity spike, extra state attributes (`boost_trigger`, `boost_trigger_sensor`, `boost_trigger_rate`) are added. No attributes = manual trigger. |
 
 Entities marked "Disabled" in the Default column are created but disabled by default. Enable them in **Settings > Devices & Services > Entities** if your device has the corresponding sensor hardware (e.g., CO2 sensors, humidity sensor).
 
@@ -113,7 +113,7 @@ After setup, configure the integration options:
 
 | Option | Default | Range | Description |
 |---|---|---|---|
-| Scan interval | 60 | 30–300 seconds | How often to poll the Brink Home API |
+| Scan interval | 60 | 45–300 seconds | How often to poll the Brink Home API |
 | Freezing threshold | -2 | -10 to +10 °C | Temperature below which winter mode activates. Winter mode reduces ventilation levels to lower preheater electricity usage during freezing conditions. |
 | Temperature source | _(Brink sensor)_ | Entity selector | Optional: outdoor temperature override for season detection. If empty, uses the Brink unit's fresh air temperature sensor. |
 | Indoor temperature sensor 1 | _(empty)_ | Entity selector | Optional: indoor temperature sensor for heat recovery efficiency calculation |
@@ -134,7 +134,7 @@ After setup, configure the integration options:
 | Summer base level | 2 | 0–3 | Normal ventilation level in summer |
 | Winter base level | 1 | 0–3 | Normal ventilation level in winter |
 | Humidity sensor 1–3 | _(empty)_ | Entity selector | Up to 3 humidity sensors to monitor for spikes |
-| Humidity spike rate threshold | 2 | 0.5–20 %/min | Humidity rate of change (%/min) that triggers extra ventilation |
+| Humidity spike rate threshold | 1.5 | 0.5–20 %/min | Humidity rate of change (%/min) that triggers extra ventilation |
 
 ## Removal
 
@@ -155,6 +155,15 @@ The **Extra ventilation** switch activates a timed ventilation boost. When turne
 5. After the timer expires, ventilation returns to the previous state.
 
 The winter/summer split exists because Brink ventilation units have a preheater that prevents freezing of the heat exchanger. At high flow rates in freezing conditions, the preheater uses significant electricity. Setting a lower max level in winter avoids this.
+
+### Boost Trigger Attribution
+
+The integration tracks **why** the extra ventilation boost was activated and shows this in the Home Assistant activity log (logbook):
+
+- **Humidity spike**: The logbook shows "activated due to humidity spike on sensor.xxx (2.1%/min)". The switch entity gains `boost_trigger`, `boost_trigger_sensor`, and `boost_trigger_rate` state attributes.
+- **Manual**: The logbook shows "activated manually". No extra state attributes are added — the absence of `boost_trigger` means it was a manual action.
+
+When the boost ends, a deactivation event is also logged ("timer expired" or "cancelled manually").
 
 ## Recommended Ventilation Level Setup
 
@@ -199,8 +208,8 @@ If the internet connection is lost when a ventilation level change is needed:
 
 This is a **cloud polling** integration. It periodically fetches data from the Brink Home API.
 
-- **Default polling interval**: 60 seconds (configurable in integration options, minimum 30 seconds).
-- **Expedited polling**: After a write command (changing mode, ventilation level, or bypass), the polling interval is temporarily reduced to 15 seconds for 3 minutes so that changes are reflected quickly.
+- **Default polling interval**: 60 seconds (configurable in integration options, minimum 45 seconds).
+- **Expedited polling**: After a write command (changing mode, ventilation level, or bypass), the polling interval is temporarily reduced to 15 seconds for 3 minutes so that changes are reflected quickly. This temporary 15-second interval is a fixed internal behaviour and is not configurable — it is separate from the user-configurable scan interval.
 - **Authentication**: Uses OIDC with PKCE (OAuth 2.0) for secure authentication with the Brink Home portal.
 - **Coordinator pattern**: Uses Home Assistant's `DataUpdateCoordinator` so all entities share a single polling cycle, minimizing API calls.
 - **No local network access required**: All communication goes through the Brink Home cloud. The integration does not connect to your ventilation unit directly over your local network.

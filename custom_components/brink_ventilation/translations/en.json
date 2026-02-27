@@ -103,8 +103,8 @@
       }
     },
     "error": {
-      "scan_interval_too_low": "Scan interval must be at least 15 seconds.",
-      "scan_interval_out_of_range": "Scan interval must be between 15 and 300 seconds.",
+      "scan_interval_too_low": "Scan interval must be at least 45 seconds.",
+      "scan_interval_out_of_range": "Scan interval must be between 45 and 300 seconds.",
       "unknown": "An unexpected error occurred."
     }
   },

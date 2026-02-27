@@ -103,8 +103,8 @@
       }
     },
     "error": {
-      "scan_interval_too_low": "Das Abfrageintervall muss mindestens 15 Sekunden betragen.",
-      "scan_interval_out_of_range": "Das Abfrageintervall muss zwischen 15 und 300 Sekunden liegen.",
+      "scan_interval_too_low": "Das Abfrageintervall muss mindestens 45 Sekunden betragen.",
+      "scan_interval_out_of_range": "Das Abfrageintervall muss zwischen 45 und 300 Sekunden liegen.",
       "unknown": "Ein unerwarteter Fehler ist aufgetreten."
     }
   },

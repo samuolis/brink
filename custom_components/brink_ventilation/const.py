@@ -7,8 +7,9 @@ MANUFACTURER = "Brink"
 DEFAULT_MODEL = "Flair"
 
 DEFAULT_SCAN_INTERVAL = 60
-MIN_SCAN_INTERVAL = 15
+MIN_SCAN_INTERVAL = 45
 REFRESH_DELAY = 2
+EXPEDITED_INTERVAL = 15  # seconds — fixed fast poll rate, not user-configurable
 EXPEDITED_DURATION = 180  # seconds (3 min) of fast polling after a write
 
 # Options flow config keys
