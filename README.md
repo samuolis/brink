@@ -136,6 +136,30 @@ After setup, configure the integration options:
 | Humidity sensor 1–3 | _(empty)_ | Entity selector | Up to 3 humidity sensors to monitor for spikes |
 | Humidity spike rate threshold | 1.5 | 0.5–20 %/min | Humidity rate of change (%/min) that triggers extra ventilation |
 
+## Upgrading from v1.x
+
+Version 2.0 is a major rewrite. The integration automatically migrates what it can, but some changes require manual attention.
+
+### Automatic Migrations
+
+These are handled automatically on first startup after the upgrade:
+
+- **Scan interval**: If your configured scan interval was below 45 seconds, it is raised to 45 seconds (the new minimum) to reduce load on the Brink API.
+- **Device identifiers**: The internal device identifier format has changed. Existing devices are automatically updated so you keep your area assignments, customizations, and dashboard cards.
+
+### Breaking Changes
+
+- **Fan entity removed**: The old `fan.` entity has been replaced by separate `select.` (ventilation level, operating mode, bypass) and `switch.` (extra ventilation) entities. **Automations and dashboard cards referencing the old `fan.` entity must be updated manually.**
+- **New options flow**: The options page now has 3 steps (General, Extra Ventilation, Adaptive mode) instead of just a scan interval field. All new options have sensible defaults.
+- **API upgrade**: Reads now use the v1.1 API (OIDC authentication) which returns 20 parameters instead of 5. Many new sensors are available.
+
+### Recommended Steps After Upgrade
+
+1. Restart Home Assistant after installing the update.
+2. Check **Settings > Devices & Services > Entities** — enable any new sensors relevant to your setup.
+3. Update any automations that referenced `fan.` entities to use the new `select.` and `switch.` entities.
+4. Review the integration options (**Configure**) to set up the new features (freezing threshold, extra ventilation, adaptive mode).
+
 ## Removal
 
 1. Go to **Settings > Devices & Services**.

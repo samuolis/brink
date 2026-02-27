@@ -11,12 +11,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry
 
 _LOGGER = logging.getLogger(__name__)
 
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL
 from .coordinator import BrinkDataCoordinator
 from .core.brink_home_cloud import BrinkAuthError, BrinkHomeCloud
 
@@ -39,8 +40,63 @@ class BrinkRuntimeData:
 type BrinkConfigEntry = ConfigEntry[BrinkRuntimeData]
 
 
+def _migrate_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Migrate options from v1.x to v2.0.
+
+    - Clamp scan_interval to the new minimum (45s).
+    """
+    opts = dict(entry.options)
+    changed = False
+
+    scan_interval = opts.get(CONF_SCAN_INTERVAL)
+    if scan_interval is not None and int(scan_interval) < MIN_SCAN_INTERVAL:
+        _LOGGER.info(
+            "Migrating scan_interval from %s to %s (new minimum)",
+            scan_interval,
+            MIN_SCAN_INTERVAL,
+        )
+        opts[CONF_SCAN_INTERVAL] = MIN_SCAN_INTERVAL
+        changed = True
+
+    if changed:
+        hass.config_entries.async_update_entry(entry, options=opts)
+
+
+def _migrate_device_identifiers(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Migrate device identifiers from v1.x 3-tuple to v2.0 2-tuple format.
+
+    v1.x used (DOMAIN, system_id, gateway_id) — a non-standard 3-element tuple.
+    v2.0 uses (DOMAIN, str(system_id)) — the standard 2-element format.
+    Without this migration, HA would create duplicate devices on upgrade.
+    """
+    dev_reg = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
+        new_ids: set[tuple[str, str]] = set()
+        migrated = False
+        for ident in device.identifiers:
+            if ident[0] == DOMAIN and len(ident) == 3:
+                # Old format: (DOMAIN, system_id, gateway_id) → (DOMAIN, str(system_id))
+                new_ids.add((DOMAIN, str(ident[1])))
+                migrated = True
+            else:
+                new_ids.add(ident)
+
+        if migrated:
+            _LOGGER.info(
+                "Migrating device identifiers for %s: %s → %s",
+                device.name,
+                device.identifiers,
+                new_ids,
+            )
+            dev_reg.async_update_device(device.id, new_identifiers=new_ids)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: BrinkConfigEntry) -> bool:
     """Set up Brink home from a config entry."""
+    # Run v1.x → v2.0 migrations
+    _migrate_options(hass, entry)
+    _migrate_device_identifiers(hass, entry)
+
     username: str = entry.data[CONF_USERNAME]
     password: str = entry.data[CONF_PASSWORD]
 
