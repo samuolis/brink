@@ -257,6 +257,10 @@ class BrinkHomeConfigFlow(ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(OptionsFlow):
     """Handle an options flow for Brink-home."""
 
+    def __init__(self) -> None:
+        """Initialize the options flow."""
+        self._options_data: dict[str, Any] = {}
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -361,7 +365,7 @@ class OptionsFlowHandler(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Step 2: Extra ventilation settings."""
-        if not hasattr(self, "_options_data"):
+        if not self._options_data:
             self._options_data = dict(self.config_entry.options)
 
         if user_input is not None:

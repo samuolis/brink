@@ -6,6 +6,7 @@ import logging
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import BrinkConfigEntry
@@ -88,8 +89,26 @@ class BrinkExtraVentilationSwitch(BrinkHomeDeviceEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         """Start the extra ventilation boost."""
-        await self.coordinator.automation_controller.async_activate_extra_ventilation()
+        try:
+            await self.coordinator.automation_controller.async_activate_extra_ventilation()
+        except HomeAssistantError:
+            raise
+        except Exception as ex:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="boost_failed",
+                translation_placeholders={"error": str(ex)},
+            ) from ex
 
     async def async_turn_off(self, **kwargs) -> None:
         """Cancel the extra ventilation boost."""
-        await self.coordinator.automation_controller.async_cancel_extra_ventilation()
+        try:
+            await self.coordinator.automation_controller.async_cancel_extra_ventilation()
+        except HomeAssistantError:
+            raise
+        except Exception as ex:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="boost_failed",
+                translation_placeholders={"error": str(ex)},
+            ) from ex

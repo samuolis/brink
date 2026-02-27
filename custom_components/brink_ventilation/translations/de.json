@@ -7,6 +7,32 @@
         "data": {
           "username": "E-Mail",
           "password": "Passwort"
+        },
+        "data_description": {
+          "username": "Die E-Mail-Adresse, mit der Sie sich beim Brink Home Portal anmelden.",
+          "password": "Ihr Brink Home Portal-Passwort."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Brink Home erneut authentifizieren",
+        "description": "Ihre Sitzung f\u00fcr {username} ist abgelaufen. Bitte geben Sie Ihr Passwort ein, um sich erneut zu authentifizieren.",
+        "data": {
+          "password": "Passwort"
+        },
+        "data_description": {
+          "password": "Ihr Brink Home Portal-Passwort."
+        }
+      },
+      "reconfigure": {
+        "title": "Brink Home neu konfigurieren",
+        "description": "Aktualisieren Sie Ihre Brink Home Portal-Zugangsdaten.",
+        "data": {
+          "username": "E-Mail",
+          "password": "Passwort"
+        },
+        "data_description": {
+          "username": "Die E-Mail-Adresse, mit der Sie sich beim Brink Home Portal anmelden.",
+          "password": "Ihr Brink Home Portal-Passwort."
         }
       }
     },
@@ -17,7 +43,8 @@
     },
     "abort": {
       "already_configured": "Konto ist bereits konfiguriert.",
-      "reauth_successful": "Erneute Authentifizierung war erfolgreich."
+      "reauth_successful": "Erneute Authentifizierung war erfolgreich.",
+      "account_mismatch": "Das Konto stimmt nicht mit dem zu konfigurierenden Konto \u00fcberein."
     }
   },
   "options": {
