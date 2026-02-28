@@ -78,6 +78,7 @@ PARAM_OPERATING_MODE = "operating_mode"
 PARAM_REMAINING_DURATION = "remaining_duration"
 PARAM_SUPPLY_AIR_FLOW = "supply_air_flow"
 PARAM_EXHAUST_AIR_FLOW = "exhaust_air_flow"
+PARAM_EXHAUST_TEMP = "exhaust_temp"
 PARAM_FRESH_AIR_TEMP = "fresh_air_temp"
 PARAM_SUPPLY_TEMP = "supply_temp"
 PARAM_BYPASS_VALVE_STATUS = "bypass_valve_status"
@@ -103,6 +104,7 @@ PARAM_NAME_MAP: dict[str, str] = {
     "Restlaufzeit Betriebsartfunktion": PARAM_REMAINING_DURATION,
     "Ist-Wert Luftdurchsatz Zuluft": PARAM_SUPPLY_AIR_FLOW,
     "Ist-Wert Luftdurchsatz Abluft": PARAM_EXHAUST_AIR_FLOW,
+    "Ablufttemperatur": PARAM_EXHAUST_TEMP,
     "Frischlufttemperatur": PARAM_FRESH_AIR_TEMP,
     "Zulufttemperatur": PARAM_SUPPLY_TEMP,
     "Status Bypassklappe": PARAM_BYPASS_VALVE_STATUS,

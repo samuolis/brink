@@ -64,6 +64,9 @@
       "fresh_air_temp": {
         "default": "mdi:thermometer"
       },
+      "exhaust_temp": {
+        "default": "mdi:thermometer"
+      },
       "supply_temp": {
         "default": "mdi:thermometer"
       },

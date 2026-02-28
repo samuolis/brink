@@ -149,6 +149,9 @@
       "fresh_air_temp": {
         "name": "Au\u00dfenlufttemperatur"
       },
+      "exhaust_temp": {
+        "name": "Ablufttemperatur"
+      },
       "supply_temp": {
         "name": "Zulufttemperatur"
       },

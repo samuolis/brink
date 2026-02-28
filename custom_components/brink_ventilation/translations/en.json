@@ -149,6 +149,9 @@
       "fresh_air_temp": {
         "name": "Fresh air temperature"
       },
+      "exhaust_temp": {
+        "name": "Exhaust air temperature"
+      },
       "supply_temp": {
         "name": "Supply temperature"
       },
