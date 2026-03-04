@@ -79,7 +79,7 @@ class BrinkDataCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
             raise ConfigEntryAuthFailed(f"Authentication failed: {ex}") from ex
         except aiohttp.ClientResponseError as ex:
             if ex.status == 401:
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Brink API returned 401, attempting re-authentication"
                 )
                 try:

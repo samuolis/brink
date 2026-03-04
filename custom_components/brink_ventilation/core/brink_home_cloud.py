@@ -10,7 +10,7 @@ import secrets
 import time
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlunsplit, urlparse
 
 import aiohttp
 
@@ -426,14 +426,22 @@ class BrinkHomeCloud:
                 try:
                     body = await auth_resp.text()
                     # Truncate to avoid flooding the log
-                    body_preview = body[:500] if body else "(empty)"
+                    body_preview = body[:200] if body else "(empty)"
+                except asyncio.CancelledError:
+                    raise
                 except Exception:
                     body_preview = "(could not read body)"
+                # Strip query params — they may contain authorization codes
+                # or state nonces that should not appear in logs.
+                parsed_url = urlparse(str(auth_resp.url))
+                safe_url = urlunsplit(
+                    (parsed_url.scheme, parsed_url.netloc, parsed_url.path, "", "")
+                )
                 _LOGGER.warning(
                     "OIDC authorize returned HTTP %s. "
-                    "Final URL: %s — Response body: %s",
+                    "Final URL (path only): %s — Response body: %s",
                     auth_resp.status,
-                    str(auth_resp.url),
+                    safe_url,
                     body_preview,
                 )
                 raise BrinkAuthError(
@@ -598,18 +606,13 @@ class BrinkHomeCloud:
         refresh_token = token_json.get("refresh_token")
         if refresh_token:
             self._refresh_token = refresh_token
-            _LOGGER.info(
-                "OIDC login successful, refresh token received — "
-                "verifying silent renewal works"
-            )
             # Immediately verify the refresh token works so the user gets
             # feedback now, not in ~1 hour when the access token expires.
             try:
                 await self._refresh_access_token()
-                _LOGGER.info(
-                    "Refresh token verified — silent token renewal is working. "
-                    "Full OIDC re-authentication will only be needed if the "
-                    "refresh token expires"
+                _LOGGER.debug(
+                    "OIDC login successful, refresh token verified — "
+                    "silent token renewal is active"
                 )
             except BrinkAuthError:
                 # Restore the refresh token — it may still be valid,
