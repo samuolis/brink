@@ -663,6 +663,59 @@ class BrinkHomeCloud:
             "Accept": "application/json",
         }
 
+    async def _refresh_access_token(self) -> None:
+        """Use the refresh token to silently obtain a new access token.
+
+        Raises BrinkAuthError if the refresh fails (token expired/revoked).
+        On failure, clears the stored refresh token so the caller falls
+        back to a full OIDC login.
+        """
+        if not self._refresh_token:
+            raise BrinkAuthError("No refresh token available")
+
+        token_data: dict[str, str] = {
+            "grant_type": "refresh_token",
+            "refresh_token": self._refresh_token,
+            "client_id": OIDC_CLIENT_ID,
+        }
+
+        try:
+            async with asyncio.timeout(20):
+                resp = await self._session.post(
+                    OIDC_TOKEN_URL,
+                    data=token_data,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+        except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
+            self._refresh_token = None
+            raise BrinkAuthError(f"Refresh token request failed: {ex}") from ex
+
+        if resp.status != 200:
+            self._refresh_token = None
+            await resp.release()
+            raise BrinkAuthError(
+                f"Refresh token rejected (HTTP {resp.status})"
+            )
+
+        token_json = await resp.json()
+        access_token = token_json.get("access_token")
+        if not access_token:
+            self._refresh_token = None
+            raise BrinkAuthError("Refresh response missing access_token")
+
+        self._access_token = access_token
+        expires_in: int = token_json.get("expires_in", 3599)
+        self._token_expiry = time.monotonic() + expires_in - 60
+
+        # Servers often rotate refresh tokens — store the new one if provided
+        new_refresh = token_json.get("refresh_token")
+        if new_refresh:
+            self._refresh_token = new_refresh
+
+        _LOGGER.debug(
+            "Access token refreshed silently (expires in %ss)", expires_in
+        )
+
     # -------------------------------------------------------------------------
     # Parsing helpers
     # -------------------------------------------------------------------------
