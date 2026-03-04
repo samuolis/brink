@@ -64,7 +64,7 @@ API_V1_URL = "https://www.brink-home.com/portal/api/v1.1/"
 OIDC_AUTH_URL = "https://www.brink-home.com/idsrv/connect/authorize"
 OIDC_TOKEN_URL = "https://www.brink-home.com/idsrv/connect/token"
 OIDC_CLIENT_ID = "spa"
-OIDC_REDIRECT_URI = "https://www.brink-home.com/app"
+OIDC_REDIRECT_URI = "https://www.brink-home.com/app/"
 OIDC_SCOPE = "openid api role locale offline_access"
 
 # Canonical parameter keys (matched by German API name, not numeric ID)
