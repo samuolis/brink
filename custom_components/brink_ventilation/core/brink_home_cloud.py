@@ -676,12 +676,53 @@ class BrinkHomeCloud:
     # -------------------------------------------------------------------------
 
     async def _ensure_token(self) -> None:
-        """Ensure we have a valid Bearer token, re-authenticating if needed."""
+        """Ensure we have a valid Bearer token, using refresh or full OIDC.
+
+        Uses exponential backoff on repeated failures to avoid hammering
+        the server. Backoff schedule: 60s, 120s, 240s, 480s, 900s (cap).
+        """
         if self._access_token and time.monotonic() < self._token_expiry:
             return
 
-        _LOGGER.debug("Bearer token expired or missing, re-authenticating")
-        await self._oidc_login()
+        # Check cooldown before hitting the server
+        now = time.monotonic()
+        if now < self._auth_cooldown_until:
+            remaining = int(self._auth_cooldown_until - now)
+            raise BrinkAuthError(
+                f"Authentication on cooldown, next retry in {remaining}s"
+            )
+
+        # Try refresh token first (silent, no full OIDC flow)
+        if self._refresh_token:
+            try:
+                await self._refresh_access_token()
+                self._auth_fail_count = 0
+                self._auth_cooldown_until = 0.0
+                return
+            except BrinkAuthError:
+                _LOGGER.info(
+                    "Refresh token expired or revoked, "
+                    "falling back to full OIDC login"
+                )
+                # _refresh_access_token already cleared self._refresh_token
+
+        # Full OIDC login as last resort
+        _LOGGER.debug("Performing full OIDC login")
+        try:
+            await self._oidc_login()
+            self._auth_fail_count = 0
+            self._auth_cooldown_until = 0.0
+        except BrinkAuthError:
+            self._auth_fail_count += 1
+            backoff = min(60 * (2 ** (self._auth_fail_count - 1)), 900)
+            self._auth_cooldown_until = time.monotonic() + backoff
+            _LOGGER.warning(
+                "OIDC authentication failed (attempt %s), "
+                "backing off for %s seconds before next retry",
+                self._auth_fail_count,
+                backoff,
+            )
+            raise
 
     def _bearer_headers(self) -> dict[str, str]:
         """Return headers with Bearer token for v1.1 API calls."""
