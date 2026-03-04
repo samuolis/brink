@@ -358,7 +358,35 @@ class BrinkHomeCloud:
     # -------------------------------------------------------------------------
 
     async def _oidc_login(self) -> None:
-        """Perform OIDC Authorization Code + PKCE flow to get a Bearer token."""
+        """Perform OIDC Authorization Code + PKCE flow to get a Bearer token.
+
+        Tries with offline_access scope first (for refresh tokens).
+        Falls back to the base scope if the server rejects it with 400.
+        """
+        # Try with offline_access first, fall back without it
+        scope_with_offline = OIDC_SCOPE  # includes offline_access
+        scope_without_offline = OIDC_SCOPE.replace(" offline_access", "")
+        scopes_to_try = [scope_with_offline, scope_without_offline]
+
+        for scope in scopes_to_try:
+            try:
+                await self._oidc_login_with_scope(scope)
+                return
+            except BrinkAuthError as ex:
+                if (
+                    scope is scope_with_offline
+                    and "authorize failed with status 400" in str(ex)
+                ):
+                    _LOGGER.info(
+                        "OIDC authorize failed with offline_access scope, "
+                        "retrying without it (server may not support "
+                        "refresh tokens)"
+                    )
+                    continue
+                raise
+
+    async def _oidc_login_with_scope(self, scope: str) -> None:
+        """Perform OIDC Authorization Code + PKCE flow with a given scope."""
         code_verifier = self._generate_code_verifier()
         code_challenge = self._generate_code_challenge(code_verifier)
         state = secrets.token_urlsafe(32)
@@ -371,7 +399,7 @@ class BrinkHomeCloud:
                 "client_id": OIDC_CLIENT_ID,
                 "redirect_uri": OIDC_REDIRECT_URI,
                 "response_type": "code",
-                "scope": OIDC_SCOPE,
+                "scope": scope,
                 "state": state,
                 "nonce": nonce,
                 "code_challenge": code_challenge,
@@ -380,7 +408,7 @@ class BrinkHomeCloud:
 
             # allow_redirects=True is safe here: this is a fresh session with no
             # sensitive cookies yet.  The final URL is validated below.
-            _LOGGER.debug("Starting OIDC authorize request")
+            _LOGGER.debug("Starting OIDC authorize request (scope: %s)", scope)
             async with asyncio.timeout(30):
                 auth_resp = await oidc_session.get(
                     OIDC_AUTH_URL,
