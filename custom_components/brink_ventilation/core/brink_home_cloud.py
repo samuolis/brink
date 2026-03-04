@@ -492,7 +492,10 @@ class BrinkHomeCloud:
             elif login_resp.status == 200:
                 body = await login_resp.text()
                 if "invalid" in body.lower() or "error" in body.lower():
-                    raise BrinkAuthError("Invalid username or password")
+                    raise BrinkAuthError(
+                        "Invalid username or password",
+                        is_credentials_error=True,
+                    )
                 _LOGGER.warning(
                     "OIDC login returned 200 without redirect. "
                     "The Brink Home login flow may have changed. "
@@ -693,7 +696,8 @@ class BrinkHomeCloud:
             self._old_api_authenticated = False
             if ex.status in (401, 403):
                 raise BrinkAuthError(
-                    f"Old API login failed (HTTP {ex.status})"
+                    f"Old API login failed (HTTP {ex.status})",
+                    is_credentials_error=True,
                 ) from ex
             raise
         except (aiohttp.ClientError, asyncio.TimeoutError):
@@ -911,4 +915,16 @@ class BrinkHomeCloud:
 
 
 class BrinkAuthError(Exception):
-    """Raised when Brink Home authentication fails."""
+    """Raised when Brink Home authentication fails.
+
+    Attributes:
+        is_credentials_error: True only when the failure is definitely
+            caused by wrong username/password.  False for server errors,
+            CSRF issues, token exchange failures, etc.
+    """
+
+    def __init__(
+        self, message: str, *, is_credentials_error: bool = False
+    ) -> None:
+        super().__init__(message)
+        self.is_credentials_error = is_credentials_error

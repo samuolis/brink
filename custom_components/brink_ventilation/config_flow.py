@@ -118,8 +118,11 @@ class BrinkHomeConfigFlow(ConfigFlow, domain=DOMAIN):
 
             try:
                 await _async_test_credentials(self.hass, username, password)
-            except BrinkAuthError:
-                errors["base"] = "invalid_auth"
+            except BrinkAuthError as ex:
+                errors["base"] = (
+                    "invalid_auth" if ex.is_credentials_error
+                    else "cannot_connect"
+                )
             except aiohttp.ClientResponseError as err:
                 if err.status == 401:
                     errors["base"] = "invalid_auth"
@@ -161,8 +164,11 @@ class BrinkHomeConfigFlow(ConfigFlow, domain=DOMAIN):
                 await _async_test_credentials(
                     self.hass, self._username, password
                 )
-            except BrinkAuthError:
-                errors["base"] = "invalid_auth"
+            except BrinkAuthError as ex:
+                errors["base"] = (
+                    "invalid_auth" if ex.is_credentials_error
+                    else "cannot_connect"
+                )
             except (aiohttp.ClientError, asyncio.TimeoutError):
                 errors["base"] = "cannot_connect"
             except Exception:
@@ -205,8 +211,11 @@ class BrinkHomeConfigFlow(ConfigFlow, domain=DOMAIN):
 
             try:
                 await _async_test_credentials(self.hass, username, password)
-            except BrinkAuthError:
-                errors["base"] = "invalid_auth"
+            except BrinkAuthError as ex:
+                errors["base"] = (
+                    "invalid_auth" if ex.is_credentials_error
+                    else "cannot_connect"
+                )
             except (aiohttp.ClientError, asyncio.TimeoutError):
                 errors["base"] = "cannot_connect"
             except Exception:
