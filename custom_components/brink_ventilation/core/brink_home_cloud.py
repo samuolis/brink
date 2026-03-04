@@ -417,6 +417,21 @@ class BrinkHomeCloud:
                 )
 
             if auth_resp.status != 200:
+                # Log the response body for diagnostics — it often contains
+                # the reason (invalid_scope, rate_limited, etc.)
+                try:
+                    body = await auth_resp.text()
+                    # Truncate to avoid flooding the log
+                    body_preview = body[:500] if body else "(empty)"
+                except Exception:
+                    body_preview = "(could not read body)"
+                _LOGGER.warning(
+                    "OIDC authorize returned HTTP %s. "
+                    "Final URL: %s — Response body: %s",
+                    auth_resp.status,
+                    str(auth_resp.url),
+                    body_preview,
+                )
                 raise BrinkAuthError(
                     f"OIDC authorize failed with status {auth_resp.status}"
                 )
