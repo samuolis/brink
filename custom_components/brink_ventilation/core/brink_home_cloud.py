@@ -146,6 +146,13 @@ class BrinkHomeCloud:
         # Old API cookie auth state
         self._old_api_authenticated: bool = False
 
+        # Refresh token for silent token renewal
+        self._refresh_token: str | None = None
+
+        # Auth failure backoff state
+        self._auth_cooldown_until: float = 0.0
+        self._auth_fail_count: int = 0
+
         # Cache of last known good gateway map for resilience
         self._cached_gateway_map: dict[int, int] = {}
 
@@ -163,6 +170,9 @@ class BrinkHomeCloud:
         self._access_token = None
         self._token_expiry = 0.0
         self._old_api_authenticated = False
+        self._refresh_token = None
+        self._auth_cooldown_until = 0.0
+        self._auth_fail_count = 0
         self._username = ""
         self._password = ""
         if not self._old_session.closed:
