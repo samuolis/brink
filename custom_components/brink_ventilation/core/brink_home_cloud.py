@@ -152,6 +152,7 @@ class BrinkHomeCloud:
         # Auth failure backoff state
         self._auth_cooldown_until: float = 0.0
         self._auth_fail_count: int = 0
+        self._auth_lock = asyncio.Lock()
 
         # Cache of last known good gateway map for resilience
         self._cached_gateway_map: dict[int, int] = {}
@@ -555,6 +556,9 @@ class BrinkHomeCloud:
                     "refresh token expires"
                 )
             except BrinkAuthError:
+                # Restore the refresh token — it may still be valid,
+                # the verification failure could be transient (timeout etc.)
+                self._refresh_token = refresh_token
                 _LOGGER.warning(
                     "Refresh token verification failed — will fall back to "
                     "full OIDC re-authentication on token expiry"
@@ -684,45 +688,50 @@ class BrinkHomeCloud:
         if self._access_token and time.monotonic() < self._token_expiry:
             return
 
-        # Check cooldown before hitting the server
-        now = time.monotonic()
-        if now < self._auth_cooldown_until:
-            remaining = int(self._auth_cooldown_until - now)
-            raise BrinkAuthError(
-                f"Authentication on cooldown, next retry in {remaining}s"
-            )
+        async with self._auth_lock:
+            # Re-check after acquiring lock (another coroutine may have refreshed)
+            if self._access_token and time.monotonic() < self._token_expiry:
+                return
 
-        # Try refresh token first (silent, no full OIDC flow)
-        if self._refresh_token:
+            # Check cooldown before hitting the server
+            now = time.monotonic()
+            if now < self._auth_cooldown_until:
+                remaining = int(self._auth_cooldown_until - now)
+                raise BrinkAuthError(
+                    f"Authentication on cooldown, next retry in {remaining}s"
+                )
+
+            # Try refresh token first (silent, no full OIDC flow)
+            if self._refresh_token:
+                try:
+                    await self._refresh_access_token()
+                    self._auth_fail_count = 0
+                    self._auth_cooldown_until = 0.0
+                    return
+                except BrinkAuthError:
+                    _LOGGER.info(
+                        "Refresh token expired or revoked, "
+                        "falling back to full OIDC login"
+                    )
+                    # _refresh_access_token already cleared self._refresh_token
+
+            # Full OIDC login as last resort
+            _LOGGER.debug("Performing full OIDC login")
             try:
-                await self._refresh_access_token()
+                await self._oidc_login()
                 self._auth_fail_count = 0
                 self._auth_cooldown_until = 0.0
-                return
             except BrinkAuthError:
-                _LOGGER.info(
-                    "Refresh token expired or revoked, "
-                    "falling back to full OIDC login"
+                self._auth_fail_count = min(self._auth_fail_count + 1, 5)
+                backoff = min(60 * (2 ** (self._auth_fail_count - 1)), 900)
+                self._auth_cooldown_until = time.monotonic() + backoff
+                _LOGGER.warning(
+                    "OIDC authentication failed (attempt %s), "
+                    "backing off for %s seconds before next retry",
+                    self._auth_fail_count,
+                    backoff,
                 )
-                # _refresh_access_token already cleared self._refresh_token
-
-        # Full OIDC login as last resort
-        _LOGGER.debug("Performing full OIDC login")
-        try:
-            await self._oidc_login()
-            self._auth_fail_count = 0
-            self._auth_cooldown_until = 0.0
-        except BrinkAuthError:
-            self._auth_fail_count += 1
-            backoff = min(60 * (2 ** (self._auth_fail_count - 1)), 900)
-            self._auth_cooldown_until = time.monotonic() + backoff
-            _LOGGER.warning(
-                "OIDC authentication failed (attempt %s), "
-                "backing off for %s seconds before next retry",
-                self._auth_fail_count,
-                backoff,
-            )
-            raise
+                raise
 
     def _bearer_headers(self) -> dict[str, str]:
         """Return headers with Bearer token for v1.1 API calls."""
@@ -756,7 +765,9 @@ class BrinkHomeCloud:
                 )
         except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
             self._refresh_token = None
-            raise BrinkAuthError(f"Refresh token request failed: {ex}") from ex
+            raise BrinkAuthError(
+                f"Refresh token request failed: {type(ex).__name__}"
+            ) from ex
 
         if resp.status != 200:
             self._refresh_token = None
@@ -765,7 +776,13 @@ class BrinkHomeCloud:
                 f"Refresh token rejected (HTTP {resp.status})"
             )
 
-        token_json = await resp.json()
+        try:
+            token_json = await resp.json()
+        except Exception:
+            self._refresh_token = None
+            await resp.release()
+            raise BrinkAuthError("Refresh response was not valid JSON")
+
         access_token = token_json.get("access_token")
         if not access_token:
             self._refresh_token = None
