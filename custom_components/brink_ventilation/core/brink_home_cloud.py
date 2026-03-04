@@ -537,9 +537,36 @@ class BrinkHomeCloud:
         expires_in: int = token_json.get("expires_in", 3599)
         self._token_expiry = time.monotonic() + expires_in - 60
 
-        _LOGGER.debug(
-            "OIDC token obtained, expires in %s seconds", expires_in
-        )
+        # Store refresh token if the server provided one
+        refresh_token = token_json.get("refresh_token")
+        if refresh_token:
+            self._refresh_token = refresh_token
+            _LOGGER.info(
+                "OIDC login successful, refresh token received — "
+                "verifying silent renewal works"
+            )
+            # Immediately verify the refresh token works so the user gets
+            # feedback now, not in ~1 hour when the access token expires.
+            try:
+                await self._refresh_access_token()
+                _LOGGER.info(
+                    "Refresh token verified — silent token renewal is working. "
+                    "Full OIDC re-authentication will only be needed if the "
+                    "refresh token expires"
+                )
+            except BrinkAuthError:
+                _LOGGER.warning(
+                    "Refresh token verification failed — will fall back to "
+                    "full OIDC re-authentication on token expiry"
+                )
+        else:
+            self._refresh_token = None
+            _LOGGER.warning(
+                "OIDC login successful but server did not provide a refresh "
+                "token (offline_access may not be supported) — full OIDC "
+                "re-authentication will be required every ~%s seconds",
+                expires_in,
+            )
 
     async def _follow_redirects_for_code(
         self,
