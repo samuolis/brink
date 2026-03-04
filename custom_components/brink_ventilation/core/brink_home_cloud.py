@@ -344,6 +344,10 @@ class BrinkHomeCloud:
                     _LOGGER.debug("Write got 401, re-authenticating old API")
                     await self._old_api_login()
                     continue
+                _LOGGER.warning(
+                    "Write to Brink API failed: still getting 401 after "
+                    "re-authentication — credentials may have changed"
+                )
                 raise BrinkAuthError("Write failed: persistent 401 after re-auth")
 
             try:
@@ -533,6 +537,12 @@ class BrinkHomeCloud:
                 )
 
             if not authorization_code:
+                _LOGGER.warning(
+                    "OIDC login completed but no authorization code was found "
+                    "in the redirect chain. The Brink Home login flow may have "
+                    "changed. Please report this at "
+                    "https://github.com/samuolis/brink/issues"
+                )
                 raise BrinkAuthError(
                     "Could not extract authorization code from OIDC flow"
                 )
@@ -673,8 +683,10 @@ class BrinkHomeCloud:
                     if final_code:
                         return final_code
                     break
-            except (aiohttp.ClientError, asyncio.TimeoutError):
-                _LOGGER.debug("Error following redirect")
+            except (aiohttp.ClientError, asyncio.TimeoutError) as redir_ex:
+                _LOGGER.warning(
+                    "OIDC redirect chain interrupted: %s", redir_ex
+                )
                 break
 
         return None
@@ -715,8 +727,11 @@ class BrinkHomeCloud:
                     is_credentials_error=True,
                 ) from ex
             raise
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+        except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
             self._old_api_authenticated = False
+            _LOGGER.warning(
+                "Old portal API login failed (connection issue): %s", ex
+            )
             raise
 
         self._old_api_authenticated = True

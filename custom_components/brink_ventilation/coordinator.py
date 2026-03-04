@@ -70,33 +70,63 @@ class BrinkDataCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
         try:
             data = await self._fetch_devices()
         except BrinkAuthError as ex:
+            _LOGGER.warning(
+                "Brink authentication failed: %s — "
+                "check Settings > Devices & Services > Brink Ventilation "
+                "for re-authentication",
+                ex,
+            )
             raise ConfigEntryAuthFailed(f"Authentication failed: {ex}") from ex
         except aiohttp.ClientResponseError as ex:
             if ex.status == 401:
+                _LOGGER.info(
+                    "Brink API returned 401, attempting re-authentication"
+                )
                 try:
                     await self.client.login()
                     data = await self._fetch_devices()
                 except BrinkAuthError as retry_ex:
+                    _LOGGER.warning(
+                        "Brink re-authentication failed: %s", retry_ex
+                    )
                     raise ConfigEntryAuthFailed(
                         f"Re-authentication failed: {retry_ex}"
                     ) from retry_ex
                 except aiohttp.ClientResponseError as retry_ex:
                     if retry_ex.status == 401:
+                        _LOGGER.warning(
+                            "Brink API still returning 401 after "
+                            "re-authentication — credentials may have changed"
+                        )
                         raise ConfigEntryAuthFailed(
                             "Re-authentication failed (HTTP 401)"
                         ) from retry_ex
+                    _LOGGER.warning(
+                        "Brink API error HTTP %s during re-authentication",
+                        retry_ex.status,
+                    )
                     raise UpdateFailed(
                         f"API error during re-auth (HTTP {retry_ex.status})"
                     ) from retry_ex
                 except (aiohttp.ClientError, asyncio.TimeoutError) as retry_ex:
+                    _LOGGER.warning(
+                        "Connection lost to Brink during re-authentication: %s",
+                        retry_ex,
+                    )
                     raise UpdateFailed(
                         f"Connection lost during re-auth: {retry_ex}"
                     ) from retry_ex
             else:
+                _LOGGER.warning(
+                    "Brink API returned HTTP %s: %s",
+                    ex.status,
+                    ex.message,
+                )
                 raise UpdateFailed(
                     f"API error (HTTP {ex.status}): {ex.message}"
                 ) from ex
         except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
+            _LOGGER.warning("Cannot reach Brink Home portal: %s", ex)
             raise UpdateFailed(f"Connection error: {ex}") from ex
 
         # Notify automation controller of fresh data
