@@ -256,9 +256,6 @@
     "parameter_unavailable": {
       "message": "Parameter not available for {entity_key}. The device may be offline."
     },
-    "gateway_unavailable": {
-      "message": "Cannot send command: gateway not available. The Brink Home portal may be experiencing issues."
-    },
     "parameter_read_only": {
       "message": "Cannot send command: parameter {entity_key} is read-only."
     },
@@ -270,12 +267,6 @@
     },
     "write_queued": {
       "message": "Command queued \u2014 will retry when connection is restored."
-    }
-  },
-  "issues": {
-    "gateway_not_available": {
-      "title": "Gateway not available for {device_name}",
-      "description": "The gateway for your Brink ventilation device \"{device_name}\" is not reachable. Write commands (changing mode, ventilation level, bypass) will not work until the gateway comes back online. Check that your Brink device is powered on and connected to the internet."
     }
   }
 }

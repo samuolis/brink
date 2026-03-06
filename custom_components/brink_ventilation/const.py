@@ -26,6 +26,8 @@ CONF_HUMIDITY_SENSOR_3 = "humidity_sensor_3"
 CONF_HUMIDITY_SPIKE_THRESHOLD = "humidity_spike_threshold"
 CONF_INDOOR_TEMPERATURE_ENTITY_1 = "indoor_temperature_entity_1"
 CONF_INDOOR_TEMPERATURE_ENTITY_2 = "indoor_temperature_entity_2"
+CONF_ADAPTIVE_ACTIVE = "adaptive_active"
+CONF_ADAPTIVE_ACTIVE_LEGACY = "ha_automated_active"
 
 # Defaults for new options
 DEFAULT_FREEZING_THRESHOLD = -2.0
@@ -55,9 +57,9 @@ BOOST_TRIGGER_HUMIDITY = "humidity_spike"
 # Logbook events
 EVENT_BOOST_ACTIVATED = f"{DOMAIN}_boost_activated"
 EVENT_BOOST_DEACTIVATED = f"{DOMAIN}_boost_deactivated"
+EVENT_WRITE_FAILED = f"{DOMAIN}_write_failed"
 
 # API endpoints
-API_URL = "https://www.brink-home.com/portal/api/portal/"
 API_V1_URL = "https://www.brink-home.com/portal/api/v1.1/"
 
 # OIDC authentication
@@ -65,7 +67,7 @@ OIDC_AUTH_URL = "https://www.brink-home.com/idsrv/connect/authorize"
 OIDC_TOKEN_URL = "https://www.brink-home.com/idsrv/connect/token"
 OIDC_CLIENT_ID = "spa"
 OIDC_REDIRECT_URI = "https://www.brink-home.com/app/"
-OIDC_SCOPE = "openid api role locale offline_access"
+OIDC_SCOPE = "openid api role locale"
 
 # Canonical parameter keys (matched by German API name, not numeric ID)
 PARAM_DEVICE_TYPE = "device_type"

@@ -13,7 +13,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
@@ -36,7 +35,7 @@ class BrinkDataCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
     """Coordinator that fetches data from Brink Home API.
 
     Data is a dict keyed by system_id, where each value is a device dict
-    containing system_id, gateway_id, name, serial_number, gateway_state,
+    containing system_id, name, serial_number, gateway_state,
     and components (with parameters).
     """
 
@@ -62,7 +61,6 @@ class BrinkDataCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
         self.client = client
         self._expedited_unsub: CALLBACK_TYPE | None = None
         self._expedited_normal_interval: timedelta | None = None
-        self._gateway_issue_active: dict[int, bool] = {}
         self.automation_controller = BrinkAutomationController(hass, self, entry)
 
     async def _async_update_data(self) -> dict[int, dict[str, Any]]:
@@ -158,15 +156,11 @@ class BrinkDataCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
 
             devices[system_id] = {
                 "system_id": system_id,
-                "gateway_id": system.get("gateway_id"),
                 "name": system.get("name", "Brink Ventilation"),
                 "serial_number": system.get("serial_number", ""),
                 "gateway_state": system.get("gateway_state"),
                 "components": device_data.get("components", []),
             }
-
-            # Manage repair issues for gateway availability
-            self._update_gateway_repair_issue(system_id, devices[system_id])
 
         if systems and not devices:
             raise UpdateFailed(
@@ -175,34 +169,6 @@ class BrinkDataCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
 
         _LOGGER.debug("Fetched %s devices with parameters", len(devices))
         return devices
-
-    def _update_gateway_repair_issue(
-        self, system_id: int, device: dict[str, Any]
-    ) -> None:
-        """Create or clear repair issues based on gateway state."""
-        issue_id = f"gateway_no_write_{system_id}"
-        gw_missing = device.get("gateway_id") is None
-
-        # Only update if state changed
-        if self._gateway_issue_active.get(system_id) == gw_missing:
-            return
-
-        self._gateway_issue_active[system_id] = gw_missing
-
-        if gw_missing:
-            ir.async_create_issue(
-                self.hass,
-                DOMAIN,
-                issue_id,
-                is_fixable=False,
-                severity=ir.IssueSeverity.WARNING,
-                translation_key="gateway_not_available",
-                translation_placeholders={
-                    "device_name": device.get("name", "Unknown"),
-                },
-            )
-        else:
-            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
 
     @callback
     def start_expedited_polling(self) -> None:

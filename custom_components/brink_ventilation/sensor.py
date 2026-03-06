@@ -20,7 +20,7 @@ from homeassistant.const import (
     UnitOfTime,
     UnitOfVolumeFlowRate,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import BrinkConfigEntry
@@ -55,7 +55,7 @@ from .const import (
     SEASON_WINTER,
 )
 from .coordinator import BrinkDataCoordinator
-from .entity import BrinkHomeDeviceEntity
+from .entity import BrinkHomeDeviceEntity, setup_dynamic_platform
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -202,6 +202,55 @@ SENSOR_DESCRIPTIONS: list[BrinkSensorDescription] = [
 ]
 
 
+def _create_sensor_entities(
+    coordinator: BrinkDataCoordinator, new_systems: set[int]
+) -> list[SensorEntity]:
+    """Create sensor entities for newly discovered systems."""
+    entities: list[SensorEntity] = []
+
+    for system_id in new_systems:
+        device = coordinator.data[system_id]
+        found_params: set[str] = set()
+        for component in device.get("components", []):
+            params = component.get("parameters", {})
+            for desc in SENSOR_DESCRIPTIONS:
+                if desc.param_id in params and desc.param_id not in found_params:
+                    entities.append(
+                        BrinkHomeSensorEntity(
+                            coordinator=coordinator,
+                            system_id=system_id,
+                            param_id=desc.param_id,
+                            entity_key=desc.key,
+                            description=desc,
+                        )
+                    )
+                    found_params.add(desc.param_id)
+
+    # Add automation-controller-based sensors (not tied to API parameters)
+    for system_id in new_systems:
+        entities.append(
+            BrinkExtraVentRemainingEntity(coordinator, system_id)
+        )
+        entities.append(
+            BrinkCurrentSeasonEntity(coordinator, system_id)
+        )
+
+        # Always create all 3 humidity delta slots — they dynamically
+        # read their source sensor from options, no restart needed.
+        for sensor_num in (1, 2, 3):
+            entities.append(
+                BrinkHumidityDeltaEntity(coordinator, system_id, sensor_num)
+            )
+
+        entities.append(
+            BrinkHeatRecoveryEfficiencyEntity(coordinator, system_id)
+        )
+
+    if entities:
+        _LOGGER.debug("Adding %s sensor entities", len(entities))
+    return entities
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: BrinkConfigEntry,
@@ -209,65 +258,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Brink Home sensor platform."""
     coordinator = entry.runtime_data.coordinator
-    known_systems: set[int] = set()
-
-    @callback
-    def _async_add_new_devices() -> None:
-        """Detect new devices and add sensor entities for them."""
-        if not coordinator.data:
-            return
-
-        new_systems = set(coordinator.data) - known_systems
-        if not new_systems:
-            return
-
-        known_systems.update(new_systems)
-        entities: list[SensorEntity] = []
-
-        for system_id in new_systems:
-            device = coordinator.data[system_id]
-            found_params: set[str] = set()
-            for component in device.get("components", []):
-                params = component.get("parameters", {})
-                for desc in SENSOR_DESCRIPTIONS:
-                    if desc.param_id in params and desc.param_id not in found_params:
-                        entities.append(
-                            BrinkHomeSensorEntity(
-                                coordinator=coordinator,
-                                system_id=system_id,
-                                param_id=desc.param_id,
-                                entity_key=desc.key,
-                                description=desc,
-                            )
-                        )
-                        found_params.add(desc.param_id)
-
-        # Add automation-controller-based sensors (not tied to API parameters)
-        for system_id in new_systems:
-            entities.append(
-                BrinkExtraVentRemainingEntity(coordinator, system_id)
-            )
-            entities.append(
-                BrinkCurrentSeasonEntity(coordinator, system_id)
-            )
-
-            # Always create all 3 humidity delta slots — they dynamically
-            # read their source sensor from options, no restart needed.
-            for sensor_num in (1, 2, 3):
-                entities.append(
-                    BrinkHumidityDeltaEntity(coordinator, system_id, sensor_num)
-                )
-
-            entities.append(
-                BrinkHeatRecoveryEfficiencyEntity(coordinator, system_id)
-            )
-
-        if entities:
-            _LOGGER.debug("Adding %s sensor entities", len(entities))
-            async_add_entities(entities)
-
-    _async_add_new_devices()
-    entry.async_on_unload(coordinator.async_add_listener(_async_add_new_devices))
+    setup_dynamic_platform(coordinator, entry, async_add_entities, _create_sensor_entities)
 
 
 class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):

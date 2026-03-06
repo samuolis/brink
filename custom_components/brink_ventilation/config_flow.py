@@ -34,6 +34,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_ADAPTIVE_ACTIVE,
     CONF_AUTO_SUMMER_BASE_LEVEL,
     CONF_AUTO_WINTER_BASE_LEVEL,
     CONF_EXTRA_VENT_DURATION,
@@ -436,8 +437,8 @@ class OptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             self._options_data.update(user_input)
             # Preserve internal flags not exposed in the options UI
-            self._options_data["adaptive_active"] = self.config_entry.options.get(
-                "adaptive_active", False
+            self._options_data[CONF_ADAPTIVE_ACTIVE] = self.config_entry.options.get(
+                CONF_ADAPTIVE_ACTIVE, False
             )
             return self.async_create_entry(title="", data=self._options_data)
 

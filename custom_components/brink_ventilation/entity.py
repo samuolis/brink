@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEFAULT_MODEL, DOMAIN, MANUFACTURER, PARAM_SOFTWARE_LABEL
@@ -71,12 +74,6 @@ class BrinkHomeDeviceEntity(CoordinatorEntity[BrinkDataCoordinator]):
         return None
 
     @property
-    def _gateway_id(self) -> int | None:
-        """Return the gateway ID for this entity's device."""
-        device = self._device
-        return device.get("gateway_id") if device else None
-
-    @property
     def device_info(self) -> DeviceInfo | None:
         """Return device info for the Brink entity."""
         device = self._device
@@ -106,3 +103,32 @@ class BrinkHomeDeviceEntity(CoordinatorEntity[BrinkDataCoordinator]):
             and self._device is not None
             and self._param is not None
         )
+
+
+def setup_dynamic_platform(
+    coordinator: BrinkDataCoordinator,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+    entity_factory: Callable[[BrinkDataCoordinator, set[int]], list],
+) -> None:
+    """Set up dynamic entity discovery for a platform.
+
+    entity_factory is called with (coordinator, new_system_ids: set[int])
+    and must return a list of entities to add.
+    """
+    known_systems: set[int] = set()
+
+    @callback
+    def _async_add_new_devices() -> None:
+        if not coordinator.data:
+            return
+        new_systems = set(coordinator.data) - known_systems
+        if not new_systems:
+            return
+        known_systems.update(new_systems)
+        entities = entity_factory(coordinator, new_systems)
+        if entities:
+            async_add_entities(entities)
+
+    _async_add_new_devices()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new_devices))

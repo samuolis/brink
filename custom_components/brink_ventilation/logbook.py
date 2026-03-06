@@ -10,6 +10,7 @@ from .const import (
     DOMAIN,
     EVENT_BOOST_ACTIVATED,
     EVENT_BOOST_DEACTIVATED,
+    EVENT_WRITE_FAILED,
 )
 
 
@@ -62,7 +63,19 @@ def async_describe_events(
             LOGBOOK_ENTRY_MESSAGE: message,
         }
 
+    @callback
+    def async_describe_write_failed(event: Event) -> dict[str, str]:
+        """Describe write failed event."""
+        data = event.data
+        entity_key = data.get("entity_key", "unknown")
+        error = data.get("error", "unknown error")
+        return {
+            LOGBOOK_ENTRY_NAME: "Brink write failed",
+            LOGBOOK_ENTRY_MESSAGE: f"failed to set {entity_key}: {error}",
+        }
+
     async_describe_event(DOMAIN, EVENT_BOOST_ACTIVATED, async_describe_boost_activated)
     async_describe_event(
         DOMAIN, EVENT_BOOST_DEACTIVATED, async_describe_boost_deactivated
     )
+    async_describe_event(DOMAIN, EVENT_WRITE_FAILED, async_describe_write_failed)

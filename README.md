@@ -241,10 +241,9 @@ This is a **cloud polling** integration. It periodically fetches data from the B
 ## Known Limitations
 
 - **Cloud-only**: Requires a Brink Home portal account at [www.brink-home.com](https://www.brink-home.com). There is no local API available.
-- **Write commands require gateway connectivity**: Changing operating mode, ventilation level, or bypass requires the gateway (eModule/iModule) to be online. If the gateway is offline, a repair issue will appear in Home Assistant.
+- **Write commands require gateway connectivity**: Changing operating mode, ventilation level, or bypass requires the gateway (eModule/iModule) to be online.
 - **Optional sensors disabled by default**: Sensors for CO2, humidity, remaining duration, and active control status are disabled by default. Enable them in entity settings if your device has the corresponding hardware.
 - **Polling-based updates**: Changes made outside Home Assistant (e.g., via the Brink Home app or physical controls) may take up to one polling interval to appear.
-- **Old portal API for writes**: Write commands use the legacy portal API due to Brink API limitations. Read operations use the newer v1.1 API.
 - **Single account per instance**: Only one Brink Home account can be configured per integration instance. If you have multiple accounts, you would need multiple integration entries.
 - **Adaptive (HA) mode requires external sensors**: Humidity spike detection in Adaptive mode requires external humidity sensors configured in Home Assistant. The built-in Brink humidity sensor alone is not sufficient for spike detection because it is only polled at the integration's scan interval.
 
@@ -255,7 +254,7 @@ This is a **cloud polling** integration. It periodically fetches data from the B
 | "Can't connect" error during setup | Check your internet connection. Verify the [Brink Home portal](https://www.brink-home.com) is accessible in your browser. |
 | "Email or password is incorrect" error | Double-check your credentials by logging into [www.brink-home.com](https://www.brink-home.com) directly. |
 | Entities show "Unavailable" | Check that your Brink device is powered on and connected to the internet. Check the Brink Home app to see if the device is online. |
-| Write commands fail | Check the **Repairs** section in Home Assistant. A "Gateway not available" issue means the eModule/iModule is offline. Verify the device has power and internet connectivity. |
+| Write commands fail | Check that your Brink device is powered on and connected to the internet. If the error persists, go to **Settings > Devices & Services**, find the integration, and click **Reconfigure** to re-authenticate. |
 | Session expired / re-authentication needed | Go to **Settings > Devices & Services**, find the integration, and click **Reconfigure** to enter your password again. |
 | Sensors show unexpected values | Some sensors (e.g., CO2) will report 0 if the corresponding hardware is not installed. Disable these entities if they are not relevant to your setup. |
 | Integration not found after install | Make sure you restarted Home Assistant after installing via HACS or manually. |

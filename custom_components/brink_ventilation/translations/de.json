@@ -256,9 +256,6 @@
     "parameter_unavailable": {
       "message": "Parameter nicht verf\u00fcgbar f\u00fcr {entity_key}. Das Ger\u00e4t ist m\u00f6glicherweise offline."
     },
-    "gateway_unavailable": {
-      "message": "Befehl kann nicht gesendet werden: Gateway nicht verf\u00fcgbar. Das Brink Home Portal hat m\u00f6glicherweise Probleme."
-    },
     "parameter_read_only": {
       "message": "Befehl kann nicht gesendet werden: Parameter {entity_key} ist schreibgesch\u00fctzt."
     },
@@ -270,12 +267,6 @@
     },
     "write_queued": {
       "message": "Befehl in Warteschlange \u2014 wird erneut versucht, wenn die Verbindung wiederhergestellt ist."
-    }
-  },
-  "issues": {
-    "gateway_not_available": {
-      "title": "Gateway nicht verf\u00fcgbar f\u00fcr {device_name}",
-      "description": "Das Gateway f\u00fcr Ihr Brink-L\u00fcftungsger\u00e4t \"{device_name}\" ist nicht erreichbar. Schreibbefehle (\u00c4ndern von Modus, L\u00fcftungsstufe, Bypass) funktionieren nicht, bis das Gateway wieder online ist. \u00dcberpr\u00fcfen Sie, ob Ihr Brink-Ger\u00e4t eingeschaltet und mit dem Internet verbunden ist."
     }
   }
 }

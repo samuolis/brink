@@ -16,11 +16,14 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later
 
 from .core.brink_home_cloud import BrinkAuthError
 from .const import (
     BOOST_TRIGGER_HUMIDITY,
+    CONF_ADAPTIVE_ACTIVE,
+    CONF_ADAPTIVE_ACTIVE_LEGACY,
     CONF_AUTO_SUMMER_BASE_LEVEL,
     CONF_AUTO_WINTER_BASE_LEVEL,
     CONF_EXTRA_VENT_DURATION,
@@ -42,6 +45,7 @@ from .const import (
     DOMAIN,
     EVENT_BOOST_ACTIVATED,
     EVENT_BOOST_DEACTIVATED,
+    EVENT_WRITE_FAILED,
     PARAM_FRESH_AIR_TEMP,
     PARAM_OPERATING_MODE,
     PARAM_VENTILATION_LEVEL,
@@ -223,7 +227,7 @@ class BrinkAutomationController:
         # Persist adaptive mode active flag for startup recovery
         self._hass.config_entries.async_update_entry(
             self._entry,
-            options={**self._entry.options, "adaptive_active": True},
+            options={**self._entry.options, CONF_ADAPTIVE_ACTIVE: True},
         )
 
         base_level = await self._async_apply_seasonal_level(boosted=False)
@@ -253,9 +257,9 @@ class BrinkAutomationController:
         self._state = AutomationState.IDLE
 
         # Clear adaptive mode active flag
-        new_opts = {**self._entry.options, "adaptive_active": False}
-        new_opts.pop("ha_automated_active", None)  # migrate old key
-        if self._entry.options.get("adaptive_active", False) or self._entry.options.get("ha_automated_active", False):
+        new_opts = {**self._entry.options, CONF_ADAPTIVE_ACTIVE: False}
+        new_opts.pop(CONF_ADAPTIVE_ACTIVE_LEGACY, None)  # migrate old key
+        if self._entry.options.get(CONF_ADAPTIVE_ACTIVE, False) or self._entry.options.get(CONF_ADAPTIVE_ACTIVE_LEGACY, False):
             self._hass.config_entries.async_update_entry(
                 self._entry,
                 options=new_opts,
@@ -376,15 +380,15 @@ class BrinkAutomationController:
         old ha_automated_active key for backward compatibility.
         """
         active = self._entry.options.get(
-            "adaptive_active",
-            self._entry.options.get("ha_automated_active", False),
+            CONF_ADAPTIVE_ACTIVE,
+            self._entry.options.get(CONF_ADAPTIVE_ACTIVE_LEGACY, False),
         )
         if active:
             _LOGGER.info("Restoring adaptive mode state after restart")
             # Migrate old key if present
-            if "ha_automated_active" in self._entry.options:
-                new_opts = {**self._entry.options, "adaptive_active": True}
-                new_opts.pop("ha_automated_active", None)
+            if CONF_ADAPTIVE_ACTIVE_LEGACY in self._entry.options:
+                new_opts = {**self._entry.options, CONF_ADAPTIVE_ACTIVE: True}
+                new_opts.pop(CONF_ADAPTIVE_ACTIVE_LEGACY, None)
                 self._hass.config_entries.async_update_entry(
                     self._entry, options=new_opts
                 )
@@ -443,29 +447,42 @@ class BrinkAutomationController:
         On success: clears pending_writes, starts expedited polling.
         On failure: stores params as pending_writes for retry on next refresh.
         """
-        system_id, gateway_id = self._get_system_and_gateway_ids()
-        if system_id is None or gateway_id is None:
-            _LOGGER.warning("Cannot write: system_id or gateway_id unavailable")
+        system_id = self._get_system_id()
+        if system_id is None:
+            _LOGGER.warning("Cannot write: system_id unavailable")
             self._pending_writes = params
             return
 
         try:
-            await self._coordinator.client.write_parameters(
-                system_id, gateway_id, params
-            )
-        except BrinkAuthError:
+            await self._coordinator.client.write_parameters(system_id, params)
+        except BrinkAuthError as ex:
             _LOGGER.error(
                 "Write failed due to authentication error, not retrying: %s",
-                params,
+                str(ex),
             )
+            entity_id = self._get_switch_entity_id()
+            event_data: dict[str, Any] = {
+                "entity_key": "automation_controller",
+                "error": type(ex).__name__,
+            }
+            if entity_id is not None:
+                event_data["entity_id"] = entity_id
+            self._hass.bus.async_fire(EVENT_WRITE_FAILED, event_data)
             self._pending_writes = None
             return
-        except Exception:
+        except Exception as ex:
             _LOGGER.warning(
                 "Write failed, queuing for retry: %s",
-                params,
-                exc_info=True,
+                type(ex).__name__,
             )
+            entity_id = self._get_switch_entity_id()
+            event_data = {
+                "entity_key": "automation_controller",
+                "error": type(ex).__name__,
+            }
+            if entity_id is not None:
+                event_data["entity_id"] = entity_id
+            self._hass.bus.async_fire(EVENT_WRITE_FAILED, event_data)
             self._pending_writes = params
             return
 
@@ -565,98 +582,98 @@ class BrinkAutomationController:
             _LOGGER.debug("No humidity sensors configured, skipping timer")
             return
 
-        @callback
-        def _humidity_tick(_now: Any) -> None:
-            """Read each humidity sensor, compute rate, check for spikes."""
-            now = time.monotonic()
-            spike_entity: str | None = None
-            spike_rate: float = 0.0
-
-            for entity_id in self.configured_humidity_sensors:
-                state = self._hass.states.get(entity_id)
-                if state is None or state.state in (None, "", "unavailable", "unknown"):
-                    continue
-
-                try:
-                    value = float(state.state)
-                except (ValueError, TypeError):
-                    continue
-
-                if math.isnan(value) or math.isinf(value):
-                    continue
-                if value < 0.0 or value > 100.0:
-                    continue
-
-                if entity_id not in self._humidity_previous:
-                    # First reading — store and move on
-                    self._humidity_previous[entity_id] = (now, value)
-                    self._humidity_rates[entity_id] = 0.0
-                    continue
-
-                old_time, old_value = self._humidity_previous[entity_id]
-                elapsed_minutes = (now - old_time) / 60.0
-
-                if elapsed_minutes > 0.0 and abs(value - old_value) > 0.009:
-                    rate = round((value - old_value) / elapsed_minutes, 1)
-                    rate = max(-50.0, min(50.0, rate))
-                    self._humidity_rates[entity_id] = rate
-
-                    # Track highest spike for boost trigger
-                    if rate > spike_rate:
-                        spike_rate = rate
-                        spike_entity = entity_id
-                else:
-                    self._humidity_rates[entity_id] = 0.0
-
-                # Always replace previous (keeps elapsed ~1 min for sensitivity)
-                self._humidity_previous[entity_id] = (now, value)
-
-            # Spike detection — only trigger boost when in BASE state
-            if (
-                spike_entity is not None
-                and self._state == AutomationState.BASE
-                and not self._boost_pending
-            ):
-                threshold: float = float(
-                    self._entry.options.get(
-                        CONF_HUMIDITY_SPIKE_THRESHOLD,
-                        DEFAULT_HUMIDITY_SPIKE_THRESHOLD,
-                    )
-                )
-                if spike_rate >= threshold:
-                    _LOGGER.info(
-                        "Humidity spike detected on %s: %.1f %%/min "
-                        "(threshold %.1f %%/min)",
-                        spike_entity,
-                        spike_rate,
-                        threshold,
-                    )
-                    self._boost_pending = True
-                    try:
-                        self._cancel_pending_task()
-                        self._pending_task = self._hass.async_create_task(
-                            self._safe_activate_extra_ventilation(
-                                trigger_entity=spike_entity,
-                                trigger_rate=spike_rate,
-                            ),
-                            "brink_ventilation_humidity_boost",
-                        )
-                    except Exception:
-                        self._boost_pending = False
-                        _LOGGER.exception("Failed to create humidity boost task")
-
-            # Trigger entity state update so delta sensors reflect new rates
-            self._coordinator.async_set_updated_data(self._coordinator.data)
-
-            # Reschedule
-            self._humidity_timer_unsub = async_call_later(
-                self._hass, self._HUMIDITY_CHECK_INTERVAL, _humidity_tick
-            )
-
         self._humidity_timer_unsub = async_call_later(
-            self._hass, self._HUMIDITY_CHECK_INTERVAL, _humidity_tick
+            self._hass, self._HUMIDITY_CHECK_INTERVAL, self._process_humidity_tick
         )
         _LOGGER.debug("Started humidity timer for: %s", sensors)
+
+    @callback
+    def _process_humidity_tick(self, _now: Any) -> None:
+        """Read each humidity sensor, compute rate, check for spikes."""
+        now = time.monotonic()
+        spike_entity: str | None = None
+        spike_rate: float = 0.0
+
+        for entity_id in self.configured_humidity_sensors:
+            state = self._hass.states.get(entity_id)
+            if state is None or state.state in (None, "", "unavailable", "unknown"):
+                continue
+
+            try:
+                value = float(state.state)
+            except (ValueError, TypeError):
+                continue
+
+            if math.isnan(value) or math.isinf(value):
+                continue
+            if value < 0.0 or value > 100.0:
+                continue
+
+            if entity_id not in self._humidity_previous:
+                # First reading -- store and move on
+                self._humidity_previous[entity_id] = (now, value)
+                self._humidity_rates[entity_id] = 0.0
+                continue
+
+            old_time, old_value = self._humidity_previous[entity_id]
+            elapsed_minutes = (now - old_time) / 60.0
+
+            if elapsed_minutes > 0.0 and abs(value - old_value) > 0.009:
+                rate = round((value - old_value) / elapsed_minutes, 1)
+                rate = max(-50.0, min(50.0, rate))
+                self._humidity_rates[entity_id] = rate
+
+                # Track highest spike for boost trigger
+                if rate > spike_rate:
+                    spike_rate = rate
+                    spike_entity = entity_id
+            else:
+                self._humidity_rates[entity_id] = 0.0
+
+            # Always replace previous (keeps elapsed ~1 min for sensitivity)
+            self._humidity_previous[entity_id] = (now, value)
+
+        # Spike detection -- only trigger boost when in BASE state
+        if (
+            spike_entity is not None
+            and self._state == AutomationState.BASE
+            and not self._boost_pending
+        ):
+            threshold: float = float(
+                self._entry.options.get(
+                    CONF_HUMIDITY_SPIKE_THRESHOLD,
+                    DEFAULT_HUMIDITY_SPIKE_THRESHOLD,
+                )
+            )
+            if spike_rate >= threshold:
+                _LOGGER.info(
+                    "Humidity spike detected on %s: %.1f %%/min "
+                    "(threshold %.1f %%/min)",
+                    spike_entity,
+                    spike_rate,
+                    threshold,
+                )
+                self._boost_pending = True
+                try:
+                    self._cancel_pending_task()
+                    self._pending_task = self._hass.async_create_task(
+                        self._safe_activate_extra_ventilation(
+                            trigger_entity=spike_entity,
+                            trigger_rate=spike_rate,
+                        ),
+                        "brink_ventilation_humidity_boost",
+                    )
+                except Exception:
+                    self._boost_pending = False
+                    _LOGGER.exception("Failed to create humidity boost task")
+
+        # Trigger entity state update so delta sensors reflect new rates
+        self._coordinator.async_set_updated_data(self._coordinator.data)
+
+        # Reschedule
+        self._humidity_timer_unsub = async_call_later(
+            self._hass, self._HUMIDITY_CHECK_INTERVAL, self._process_humidity_tick
+        )
 
     def _cancel_humidity_timer(self) -> None:
         """Cancel the humidity check timer if active."""
@@ -746,19 +763,38 @@ class BrinkAutomationController:
     # Seasonal level helpers
     # ------------------------------------------------------------------
 
-    def _get_seasonal_base_level(self) -> int:
-        """Return the configured base ventilation level for the current season."""
+    def _get_seasonal_level(
+        self,
+        summer_key: str,
+        winter_key: str,
+        summer_default: int,
+        winter_default: int,
+    ) -> int:
+        """Return the configured ventilation level for the current season, clamped to [0, 3]."""
         options = self._entry.options
         if self._season == SEASON_WINTER:
-            return int(options.get(CONF_AUTO_WINTER_BASE_LEVEL, DEFAULT_AUTO_WINTER_BASE_LEVEL))
-        return int(options.get(CONF_AUTO_SUMMER_BASE_LEVEL, DEFAULT_AUTO_SUMMER_BASE_LEVEL))
+            level = int(options.get(winter_key, winter_default))
+        else:
+            level = int(options.get(summer_key, summer_default))
+        return max(0, min(3, level))
+
+    def _get_seasonal_base_level(self) -> int:
+        """Return the configured base ventilation level for the current season."""
+        return self._get_seasonal_level(
+            CONF_AUTO_SUMMER_BASE_LEVEL,
+            CONF_AUTO_WINTER_BASE_LEVEL,
+            DEFAULT_AUTO_SUMMER_BASE_LEVEL,
+            DEFAULT_AUTO_WINTER_BASE_LEVEL,
+        )
 
     def _get_seasonal_max_level(self) -> int:
         """Return the configured max ventilation level for the current season."""
-        options = self._entry.options
-        if self._season == SEASON_WINTER:
-            return int(options.get(CONF_EXTRA_VENT_WINTER_LEVEL, DEFAULT_EXTRA_VENT_WINTER_LEVEL))
-        return int(options.get(CONF_EXTRA_VENT_SUMMER_LEVEL, DEFAULT_EXTRA_VENT_SUMMER_LEVEL))
+        return self._get_seasonal_level(
+            CONF_EXTRA_VENT_SUMMER_LEVEL,
+            CONF_EXTRA_VENT_WINTER_LEVEL,
+            DEFAULT_EXTRA_VENT_SUMMER_LEVEL,
+            DEFAULT_EXTRA_VENT_WINTER_LEVEL,
+        )
 
     async def _async_apply_seasonal_level(self, boosted: bool = False) -> int:
         """Evaluate season and write the appropriate ventilation level. Returns the level used."""
@@ -817,18 +853,13 @@ class BrinkAutomationController:
 
         return [(mode_vid, mode_value), (level_vid, level_value)]
 
-    def _get_system_and_gateway_ids(self) -> tuple[int | None, int | None]:
-        """Return the (system_id, gateway_id) from the first system in coordinator data."""
+    def _get_system_id(self) -> int | None:
+        """Return the system_id from the first system in coordinator data."""
         data = self._coordinator.data
         if not data:
-            return None, None
-
-        for system_id, device in data.items():
-            gateway_id = device.get("gateway_id")
-            if gateway_id is not None:
-                return system_id, gateway_id
-
-        return None, None
+            return None
+        # Return the first system_id available
+        return next(iter(data), None)
 
     # ------------------------------------------------------------------
     # Boost trigger helpers
@@ -845,11 +876,13 @@ class BrinkAutomationController:
     ) -> None:
         """Fire a logbook event when extra ventilation boost starts."""
         event_data: dict[str, Any] = {
-            "entity_id": self._get_switch_entity_id(),
             "duration": duration_minutes,
             "level": level,
             "season": self._season,
         }
+        entity_id = self._get_switch_entity_id()
+        if entity_id is not None:
+            event_data["entity_id"] = entity_id
         if self._boost_trigger == BOOST_TRIGGER_HUMIDITY:
             event_data["trigger"] = BOOST_TRIGGER_HUMIDITY
             if self._boost_trigger_entity:
@@ -861,20 +894,23 @@ class BrinkAutomationController:
     def _fire_boost_deactivated_event(self, reason: str) -> None:
         """Fire a logbook event when extra ventilation boost ends."""
         event_data: dict[str, Any] = {
-            "entity_id": self._get_switch_entity_id(),
             "reason": reason,
         }
+        entity_id = self._get_switch_entity_id()
+        if entity_id is not None:
+            event_data["entity_id"] = entity_id
         if self._boost_trigger == BOOST_TRIGGER_HUMIDITY:
             event_data["trigger"] = BOOST_TRIGGER_HUMIDITY
         self._hass.bus.async_fire(EVENT_BOOST_DEACTIVATED, event_data)
 
-    def _get_switch_entity_id(self) -> str:
-        """Return the entity_id for the extra ventilation switch."""
-        data = self._coordinator.data
-        if data:
-            for system_id in data:
-                return f"switch.brink_{system_id}_extra_ventilation"
-        return f"switch.{DOMAIN}_extra_ventilation"
+    def _get_switch_entity_id(self) -> str | None:
+        """Get the extra ventilation switch entity_id from the registry."""
+        system_id = self._get_system_id()
+        if system_id is None:
+            return None
+        registry = er.async_get(self._hass)
+        unique_id = f"{DOMAIN}_{system_id}_extra_ventilation"
+        return registry.async_get_entity_id("switch", DOMAIN, unique_id)
 
     # ------------------------------------------------------------------
     # Timer and task cancellation helpers
