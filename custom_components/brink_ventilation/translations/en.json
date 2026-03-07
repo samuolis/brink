@@ -10,6 +10,10 @@
         }
       }
     },
+    "abort": {
+      "already_configured": "This Brink Home account is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    },
     "error": {
       "cannot_connect": "Can't connect. Try again later.",
       "invalid_auth": "Email or password is incorrect.",
