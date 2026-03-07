@@ -17,12 +17,21 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DATA_CLIENT, DATA_COORDINATOR, DEFAULT_MODEL, DEFAULT_NAME, DEFAULT_SCAN_INTERVAL, DOMAIN, PARAM_DEVICE_TYPE, PARAM_SOFTWARE_LABEL
+from .const import (
+    DATA_CLIENT,
+    DATA_COORDINATOR,
+    DEFAULT_MODEL,
+    DEFAULT_NAME,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    PARAM_DEVICE_TYPE,
+    PARAM_SOFTWARE_LABEL,
+)
 from .core.brink_home_cloud import BrinkAuthError, BrinkHomeCloud
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.SELECT, Platform.BINARY_SENSOR, Platform.FAN]
+PLATFORMS = [Platform.SELECT, Platform.BINARY_SENSOR, Platform.SENSOR, Platform.FAN]
 
 CONFIG_SCHEMA = cv.removed(DOMAIN, raise_if_present=False)
 
