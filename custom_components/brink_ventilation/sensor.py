@@ -46,6 +46,7 @@ class BrinkSensorDescription(SensorEntityDescription):
 
     parameter_key: str = ""
     is_enum: bool = False
+    required_value_state: int | None = None
 
 
 SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
@@ -86,6 +87,7 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.HUMIDITY,
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
+        required_value_state=1,
     ),
     BrinkSensorDescription(
         key=PARAM_DAYS_SINCE_FILTER_RESET,
@@ -110,6 +112,7 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_enum=True,
+        required_value_state=1,
     ),
     BrinkSensorDescription(
         key=PARAM_BYPASS_VALVE_STATUS,
@@ -126,6 +129,7 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
+        required_value_state=1,
     ),
     BrinkSensorDescription(
         key=PARAM_CO2_SENSOR_2,
@@ -134,6 +138,7 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
+        required_value_state=1,
     ),
     BrinkSensorDescription(
         key=PARAM_CO2_SENSOR_3,
@@ -142,6 +147,7 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
+        required_value_state=1,
     ),
     BrinkSensorDescription(
         key=PARAM_CO2_SENSOR_4,
@@ -150,8 +156,22 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
+        required_value_state=1,
     ),
 )
+
+
+def _should_create_sensor(device: dict, description: BrinkSensorDescription) -> bool:
+    """Return True when the Brink parameter should be exposed as a sensor."""
+    param = device.get("parameters", {}).get(description.parameter_key)
+    if not param:
+        return False
+
+    required_value_state = description.required_value_state
+    if required_value_state is None:
+        return True
+
+    return param.get("value_state") == required_value_state
 
 
 async def async_setup_entry(
@@ -165,7 +185,7 @@ async def async_setup_entry(
         BrinkHomeSensorEntity(client, coordinator, system_id, description)
         for system_id, device in (coordinator.data or {}).items()
         for description in SENSOR_DESCRIPTIONS
-        if device.get("parameters", {}).get(description.parameter_key)
+        if _should_create_sensor(device, description)
     ]
     async_add_entities(entities)
 
