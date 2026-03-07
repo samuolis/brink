@@ -1,71 +1,77 @@
 from __future__ import annotations
 
-import logging
-
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 
-from custom_components.brink_ventilation import BrinkHomeDeviceEntity
-
-from .const import (
-    DATA_CLIENT,
-    DATA_COORDINATOR,
-    DOMAIN,
-)
+from .const import DATA_CLIENT, DATA_COORDINATOR, DOMAIN, PARAM_OPERATING_MODE
+from .entity import BrinkHomeDeviceEntity
 
 
-_LOGGER = logging.getLogger(__name__)
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    """Set up the Brink Home sensor platform."""
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+):
+    """Set up the Brink operating mode select platform."""
     client = hass.data[DOMAIN][entry.entry_id][DATA_CLIENT]
     coordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
-    entities = []
 
-    _LOGGER.info(f"entity data: {coordinator.data}")
-    for deviceIndex, _ in enumerate(coordinator.data):
-        entities.append(BrinkHomeModeSelectEntity(client, coordinator, deviceIndex, "mode"))
-
-    _LOGGER.info(f"entity data: {entities}")
+    entities = [
+        BrinkHomeModeSelectEntity(client, coordinator, system_id, PARAM_OPERATING_MODE)
+        for system_id, device in (coordinator.data or {}).items()
+        if device.get("parameters", {}).get(PARAM_OPERATING_MODE)
+    ]
     async_add_entities(entities)
 
 
 class BrinkHomeModeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
+    """Representation of the Brink operating mode selector."""
 
     async def async_select_option(self, option: str):
-        await self.client.set_mode_value(self.system_id, self.gateway_id, self.data, option)
+        param = self.data
+        if param is None or param.get("value_id") is None:
+            raise HomeAssistantError("Operating mode parameter is unavailable")
+
+        selected = next(
+            (item for item in param.get("options", []) if item["label"] == option),
+            None,
+        )
+        if selected is None:
+            raise HomeAssistantError(f"Unknown operating mode option: {option}")
+
+        await self.client.write_parameters(
+            self.system_id,
+            [(int(param["value_id"]), selected["value"])],
+        )
+        param["value"] = selected["value"]
+        self.coordinator.async_set_updated_data(dict(self.coordinator.data))
+        await self.coordinator.async_request_refresh()
 
     @property
     def current_option(self) -> str | None:
-        for value in self.data["values"]:
-            if value["value"] == self.data["value"]:
-                return value["text"]
+        param = self.data
+        if param is None:
+            return None
+        for option in param.get("options", []):
+            if option["value"] == str(param.get("value")):
+                return option["label"]
         return None
 
     @property
     def options(self) -> list[str]:
-        """Return a set of selectable options."""
-        values = []
-        for value in self.data["values"]:
-            values.append(value["text"])
-
-        return values
+        param = self.data
+        if param is None:
+            return []
+        return [item["label"] for item in param.get("options", [])]
 
     @property
     def name(self):
-        return f"{self.coordinator.data[self.device_index]['name']} {self.device_info['name']}"
-
-    @property
-    def id(self):
-        return f"{DOMAIN}_{self.name}_select"
+        return f"{self.device_name} {self.parameter_name}"
 
     @property
     def unique_id(self):
-        return self.id
+        return f"{DOMAIN}_{self.system_id}_{self.parameter_key}_select"
 
     @property
     def icon(self):
-        """Return the icon to use in the frontend, if any."""
         return "mdi:hvac"
