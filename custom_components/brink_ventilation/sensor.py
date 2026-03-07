@@ -20,9 +20,11 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    ACTIVE_CONTROL_STATUS_LABELS,
     DATA_CLIENT,
     DATA_COORDINATOR,
     DOMAIN,
+    PARAM_ACTIVE_CONTROL_STATUS,
     PARAM_BYPASS_VALVE_STATUS,
     PARAM_CO2_SENSOR_1,
     PARAM_CO2_SENSOR_2,
@@ -35,6 +37,7 @@ from .const import (
     PARAM_HUMIDITY,
     PARAM_PREHEATER_STATUS,
     PARAM_REMAINING_DURATION,
+    PARAM_SUPPLY_TEMP,
     PARAM_SUPPLY_AIR_FLOW,
 )
 from .entity import BrinkHomeDeviceEntity
@@ -47,6 +50,7 @@ class BrinkSensorDescription(SensorEntityDescription):
     parameter_key: str = ""
     is_enum: bool = False
     required_value_state: int | None = None
+    value_map: dict[str, str] | None = None
 
 
 SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
@@ -81,6 +85,14 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
     ),
     BrinkSensorDescription(
+        key=PARAM_SUPPLY_TEMP,
+        name="Supply Air Temperature",
+        parameter_key=PARAM_SUPPLY_TEMP,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    BrinkSensorDescription(
         key=PARAM_HUMIDITY,
         name="Humidity",
         parameter_key=PARAM_HUMIDITY,
@@ -104,6 +116,16 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.MINUTES,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    BrinkSensorDescription(
+        key=PARAM_ACTIVE_CONTROL_STATUS,
+        name="Active Control Status",
+        parameter_key=PARAM_ACTIVE_CONTROL_STATUS,
+        device_class=SensorDeviceClass.ENUM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_enum=True,
+        value_map=ACTIVE_CONTROL_STATUS_LABELS,
+        entity_registry_enabled_default=False,
     ),
     BrinkSensorDescription(
         key=PARAM_PREHEATER_STATUS,
@@ -214,6 +236,10 @@ class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):
         if not self.entity_description.is_enum:
             return None
 
+        value_map = self.entity_description.value_map
+        if value_map is not None:
+            return list(value_map.values())
+
         param = self.data
         if param is None:
             return None
@@ -230,6 +256,10 @@ class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):
             return None
 
         if self.entity_description.is_enum:
+            value_map = self.entity_description.value_map
+            if value_map is not None:
+                return value_map.get(str(value), str(value))
+
             selected = next(
                 (item["label"] for item in param.get("options", []) if item["value"] == str(value)),
                 None,

@@ -448,8 +448,17 @@ class BrinkHomeCloud:
                         "value_state": param.get("valueState"),
                         "read_write": param.get("readWrite"),
                         "control_type": param.get("controlType"),
+                        "list_items": param.get("listItems"),
+                        "min_value": param.get("minValue"),
+                        "max_value": param.get("maxValue"),
+                        "unit_of_measure": (
+                            param.get("unit") or param.get("unitOfMeasure")
+                        ),
+                        "component_id": param.get("componentId"),
                         "numeric_id": param.get("id"),
-                        "options": BrinkHomeCloud._extract_options(param.get("listItems", [])),
+                        "options": BrinkHomeCloud._extract_options(
+                            param.get("listItems", [])
+                        ),
                     }
             BrinkHomeCloud._extract_parameters(
                 nav_item.get("navigationItems", []), parameters
