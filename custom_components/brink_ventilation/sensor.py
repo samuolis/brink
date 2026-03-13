@@ -51,6 +51,7 @@ class BrinkSensorDescription(SensorEntityDescription):
     is_enum: bool = False
     required_value_state: int | None = None
     value_map: dict[str, str] | None = None
+    enabled_value_state: int | None = None
 
 
 SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
@@ -151,7 +152,7 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
-        required_value_state=1,
+        enabled_value_state=1,
     ),
     BrinkSensorDescription(
         key=PARAM_CO2_SENSOR_2,
@@ -160,7 +161,7 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
-        required_value_state=1,
+        enabled_value_state=1,
     ),
     BrinkSensorDescription(
         key=PARAM_CO2_SENSOR_3,
@@ -169,7 +170,7 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
-        required_value_state=1,
+        enabled_value_state=1,
     ),
     BrinkSensorDescription(
         key=PARAM_CO2_SENSOR_4,
@@ -178,7 +179,7 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         device_class=SensorDeviceClass.CO2,
         native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
         state_class=SensorStateClass.MEASUREMENT,
-        required_value_state=1,
+        enabled_value_state=1,
     ),
 )
 
@@ -244,6 +245,18 @@ class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):
         if param is None:
             return None
         return [item["label"] for item in param.get("options", [])]
+
+    @property
+    def entity_registry_enabled_default(self) -> bool:
+        enabled_value_state = self.entity_description.enabled_value_state
+        if enabled_value_state is None:
+            return super().entity_registry_enabled_default
+
+        param = self.data
+        if param is None:
+            return False
+
+        return param.get("value_state") == enabled_value_state
 
     @property
     def native_value(self):

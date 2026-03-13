@@ -43,6 +43,10 @@ class BrinkHomeVentilationFanEntity(BrinkHomeDeviceEntity, FanEntity):
     """Representation of the Brink ventilation level control."""
 
     async def async_set_percentage(self, percentage: int) -> None:
+        if percentage <= 0:
+            await self._async_write_level("0")
+            return
+
         target_level = math.ceil(percentage_to_ranged_value(SPEED_RANGE, percentage))
         target_level = max(SPEED_RANGE[0], min(SPEED_RANGE[1], target_level))
         await self._async_write_level(str(target_level))
