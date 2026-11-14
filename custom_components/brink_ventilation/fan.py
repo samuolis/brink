@@ -725,7 +725,11 @@ class BrinkHomeVentilationFanEntity(BrinkHomeBaseFanEntity):
         except (TypeError, ValueError, OverflowError):
             return None
         capacity = self._max_airflow
-        if capacity is None or not math.isfinite(airflow) or not 0 <= airflow <= capacity:
+        if (
+            capacity is None
+            or not math.isfinite(airflow)
+            or not 0 <= airflow <= capacity
+        ):
             return None
         return airflow > 0
 
