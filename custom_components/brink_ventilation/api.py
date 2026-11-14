@@ -53,7 +53,6 @@ async def async_get_devices(brink_client: BrinkHomeCloud) -> dict[int, BrinkDevi
         two_letter_country_code = system["two_letter_country_code"]
         user_group_names = system["user_group_names"]
         total_count = system["total_count"]
-        _LOGGER.debug("Brink Flair system [%s] properties: %s", system_id, system)
         device, alerts, parameters = await asyncio.gather(
             brink_client.async_get_device(system_id),
             brink_client.async_get_active_alerts(system_id),
@@ -67,10 +66,8 @@ async def async_get_devices(brink_client: BrinkHomeCloud) -> dict[int, BrinkDevi
             else len(alerts)
         )
         _LOGGER.debug("Fetched %s active alerts", len(alerts))
-        _LOGGER.debug("Brink Flair device: %s", device)
         gateway_type_id = device.get("gatewayTypeId")
         is_online = device.get("isOnline")
-        _LOGGER.debug("Brink Flair device parameters: %s", parameters)
         has_blocking = any(
             alert.level == BrinkAlertLevel.BLOCKING for alert in alerts
         )
