@@ -36,6 +36,11 @@ from .const import (
     READ_WRITE_MAP,
     VALUE_STATE_MAP,
 )
+from .core.parameter_validation import (
+    is_parameter_writable,
+    redacted_parameter_attributes,
+    writable_value_id,
+)
 from .entity import BrinkHomeDeviceEntity
 
 if TYPE_CHECKING:
@@ -204,12 +209,7 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
     @staticmethod
     def _is_airflow_writable(parameter: dict[str, object]) -> bool:
         """Require explicit vendor write access before selecting or writing airflow."""
-        access = parameter.get("read_write")
-        return (
-            isinstance(access, int)
-            and not isinstance(access, bool)
-            and READ_WRITE_MAP.get(access) == "read-write"
-        )
+        return is_parameter_writable(parameter)
 
     @staticmethod
     def _validated_airflow_bounds(
@@ -338,6 +338,7 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
             )
 
         level = self._select_airflow_level(airflow)
+        self._require_writable_level_control()
         await self._set_airflow_for_level(level, airflow)
         await self._async_write_level(str(level))
 
@@ -443,27 +444,33 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
             airflow,
         )
 
-    async def _async_write_level(self, level_value: str) -> None:
-        ventilation = self.data
-        if ventilation is None or ventilation.get("value_id") is None:
+    def _require_writable_level_control(self) -> None:
+        """Preflight mandatory level and optional mode writes before changing flow."""
+        if writable_value_id(self.data) is None:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="ventilation_parameter_unavailable",
             )
-
-        params = []
-        # mode = self._operating_mode
         mode = self._parameters.get(PARAM_OPERATING_MODE)
-
-        if (
-            isinstance(mode, dict)
-            and mode.get("value_id") is not None
-        ):
-            _LOGGER.debug(
-                "Switching operating mode to manual due to fan speed change"
+        if isinstance(mode, dict) and writable_value_id(mode) is None:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="operating_mode_unavailable",
             )
-            params.append((int(mode["value_id"]), MODE_MANUAL_VALUE))
-        params.append((int(ventilation["value_id"]), level_value))
+
+    async def _async_write_level(self, level_value: str) -> None:
+        """Write an authorized ventilation level and optional manual mode."""
+        self._require_writable_level_control()
+        ventilation_id = writable_value_id(self.data)
+        assert ventilation_id is not None
+        params: list[tuple[int, str]] = []
+        mode = self._parameters.get(PARAM_OPERATING_MODE)
+        if isinstance(mode, dict):
+            mode_id = writable_value_id(mode)
+            assert mode_id is not None
+            _LOGGER.debug("Switching operating mode to manual due to fan speed change")
+            params.append((mode_id, MODE_MANUAL_VALUE))
+        params.append((ventilation_id, level_value))
 
         _LOGGER.debug(
             "Writing fan params: %s",
@@ -505,7 +512,8 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
         """Set the preset mode."""
         mode = self._parameters.get(PARAM_OPERATING_MODE)
 
-        if not isinstance(mode, dict) or mode.get("value_id") is None:
+        mode_id = writable_value_id(mode)
+        if mode_id is None:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="operating_mode_unavailable",
@@ -524,7 +532,7 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
 
         await self.client.write_parameters(
             self.system_id,
-            [(int(mode["value_id"]), selected_value)],
+            [(mode_id, selected_value)],
         )
 
         mode["value"] = selected_value
@@ -689,7 +697,7 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
             if (value := param.get(key)) is not None:
                 attributes[key] = value
 
-        return attributes
+        return redacted_parameter_attributes(attributes)
 
 
 class BrinkHomeVentilationFanEntity(BrinkHomeBaseFanEntity):
@@ -776,6 +784,7 @@ class BrinkHomeVentilationFanEntity(BrinkHomeBaseFanEntity):
             level,
         )
 
+        self._require_writable_level_control()
         await self._set_airflow_for_level(
             level=level,
             airflow=target_airflow,
@@ -785,6 +794,7 @@ class BrinkHomeVentilationFanEntity(BrinkHomeBaseFanEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         """Zero the level-zero airflow setting when switching this fan off."""
+        self._require_writable_level_control()
         await self._set_airflow_for_level(0, 0)
         await self._async_write_level("0")
 
