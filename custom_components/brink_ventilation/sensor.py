@@ -72,6 +72,7 @@ from .const import (
     VALUE_STATE_MAP,
     VENTILATION_LEVEL_LABELS,
 )
+from .core.parameter_validation import redacted_parameter_attributes
 from .entity import BrinkHomeDeviceEntity
 from .sound import (
     CABINET_SOUND_POWER_COEFFICIENTS,
@@ -717,7 +718,7 @@ def _should_create_sensor(device: dict, description: BrinkSensorDescription) -> 
     if not param:
         return False
 
-    if param.get("valueState") == 5:
+    if param.get("value_state") == ValueState.INVALID:
         return False
 
     # CO2 sensors are only available when the value is not 0, otherwise they are not connected
@@ -805,19 +806,14 @@ async def async_setup_entry(
     known_parameters.add("rh_sensor_status")
     known_parameters.add("ebus_co2_sensor_status")
 
-    for system_id, device in (coordinator.data or {}).items():
-        for key, param in device.parameters.items():
-            if key not in known_parameters:
-                _LOGGER.info(
-                    "Unhandled parameter key=%s name=%s value=%s "
-                    "control_type=%s read_write=%s options=%s",
-                    key,
-                    param.get("name"),
-                    param.get("value"),
-                    param.get("control_type"),
-                    param.get("read_write"),
-                    len(param.get("options", [])),
-                )
+    unknown_count = sum(
+        1
+        for device in (coordinator.data or {}).values()
+        for parameter_key in device.parameters
+        if parameter_key not in known_parameters
+    )
+    if unknown_count:
+        _LOGGER.debug("Brink has %s unknown parameter definitions", unknown_count)
 
     entities = [
         BrinkHomeSensorEntity(client, coordinator, system_id, description)
@@ -913,7 +909,7 @@ class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):
                 for option in param.get("options", [])
             ]
 
-        return attributes
+        return redacted_parameter_attributes(attributes)
 
     @property
     def native_unit_of_measurement(self) -> str | None:
@@ -1083,11 +1079,8 @@ class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):
             or param.get("value_state") == ValueState.INVALID
         ):
             _LOGGER.debug(
-                "gateway_state available: key=%s super=%s data=%s raw=%s",
+                "Brink sensor parameter unavailable: key=%s",
                 parameter_key,
-                super().available,
-                param,
-                self._raw_value,
             )
             # return False
 
@@ -1122,13 +1115,6 @@ class BrinkHomeSensorEntity(BrinkHomeDeviceEntity, SensorEntity):
 
         if parameter_key == "gateway_state":
             return self.coordinator.last_update_success
-
-        if self.entity_description.is_device_attribute:
-            return (
-                self.coordinator.last_update_success
-                and device is not None
-                and getattr(device, parameter_key, None) is not None
-            )
 
         if self.entity_description.is_device_attribute:
             return (
