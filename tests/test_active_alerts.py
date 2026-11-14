@@ -12,7 +12,7 @@ import pytest
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import EntityPlatform
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from tests.ha_test_support import MockConfigEntry
 
 from custom_components.brink_ventilation.api import async_get_devices
 from custom_components.brink_ventilation.const import DOMAIN
