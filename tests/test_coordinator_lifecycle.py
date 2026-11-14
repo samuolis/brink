@@ -79,9 +79,7 @@ async def test_successful_refresh_clears_previous_api_error(
         pytest.param(
             _http_error(401), ConfigEntryAuthFailed, 401, "http", id="http-401"
         ),
-        pytest.param(
-            _http_error(503), UpdateFailed, 503, "http", id="http-503"
-        ),
+        pytest.param(_http_error(503), UpdateFailed, 503, "http", id="http-503"),
         pytest.param(
             ClientConnectionError("synthetic connection interrupted"),
             UpdateFailed,
