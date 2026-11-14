@@ -187,8 +187,8 @@ Ruff `0.17.3`; install that version when reproducing the tooling environment:
 ```shell
 python -m pip install ruff==0.17.3
 python -m ruff check --select E9,F63,F7,F82 custom_components tests
-python -m ruff check tests/test_translations.py tests/test_translation_regressions.py tests/test_active_alerts.py tests/test_fan.py tests/test_coordinator_lifecycle.py tests/test_entry_lifecycle.py custom_components/brink_ventilation/fan.py custom_components/brink_ventilation/core/option_mapping.py
-python -m ruff format --check tests/test_translations.py tests/test_translation_regressions.py tests/test_active_alerts.py tests/test_fan.py tests/test_coordinator_lifecycle.py tests/test_entry_lifecycle.py custom_components/brink_ventilation/core/option_mapping.py
+python -m ruff check tests/test_translations.py tests/test_translation_regressions.py tests/test_active_alerts.py tests/test_fan.py tests/test_coordinator_lifecycle.py tests/test_entry_lifecycle.py tests/test_issue20_hardening.py custom_components/brink_ventilation/fan.py custom_components/brink_ventilation/core/option_mapping.py custom_components/brink_ventilation/core/parameter_validation.py
+python -m ruff format --check tests/test_translations.py tests/test_translation_regressions.py tests/test_active_alerts.py tests/test_fan.py tests/test_coordinator_lifecycle.py tests/test_entry_lifecycle.py tests/test_issue20_hardening.py custom_components/brink_ventilation/core/option_mapping.py custom_components/brink_ventilation/core/parameter_validation.py
 git diff --check
 ```
 
