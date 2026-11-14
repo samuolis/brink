@@ -34,6 +34,12 @@ You have two options for installation:
 
 ## Fan state
 
+The level-based fan retains its original unique ID, preserving existing
+entity-registry links and automations after upgrading. The continuous airflow
+fan treats positive airflow at level 0 as running and clears that airflow when
+turned off. Requested airflow must fit the selected device mode's actual
+minimum and maximum; unsupported rates are rejected instead of silently clipped.
+
 When the ventilation level is missing or invalid, level-dependent airflow
 attributes are omitted. Other available fan attributes remain visible.
 
