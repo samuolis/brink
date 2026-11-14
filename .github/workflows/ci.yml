@@ -112,4 +112,12 @@ jobs:
           print(f"Testing Home Assistant {installed_version}")
           PY
       - name: Run tests
-        run: python -m pytest -q
+        env:
+          HA_TEST_VERSION: ${{ matrix.home-assistant }}
+        run: |
+          if [ "$HA_TEST_VERSION" = "2026.11.0" ]; then
+            # Home Assistant 2026.11 must initialize httpx2 before pytest plugins import httpx.
+            python -c 'import homeassistant; import pytest; raise SystemExit(pytest.main(["-q"]))'
+          else
+            python -m pytest -q
+          fi
