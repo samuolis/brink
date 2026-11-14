@@ -295,7 +295,7 @@ proof that physical-device behavior has been verified.
   formatter, then rerun both checks rather than weakening the gate.
 - **Trust only checks for the current PR head.** Success on a previous commit
   is stale after a push, and GitHub concurrency can cancel superseded runs.
-  Confirm Ruff, both declared HA test versions, HACS and hassfest for the exact
+  Confirm Ruff, all declared HA test versions, HACS and hassfest for the exact
   head SHA. Report test counts from job logs, distinguish mocked versus live
   verification, and mark skipped/pending jobs accurately.
 - **Handle fork-to-upstream PRs deliberately.** If an upstream PR's head is the
@@ -304,6 +304,54 @@ proof that physical-device behavior has been verified.
   the existing upstream PR; merely opening it does not. A GitHub 403
   permission error is not a published review. Do not merge, force-rebase or
   claim an upstream update without verification and authorization.
+
+## Home Assistant 2026.11 compatibility lessons (PR #22)
+
+These lessons come from the Python 3.14 / Home Assistant 2026.11 test-matrix
+migration. Apply them to every future supported-Core release; inspect the
+actual package metadata and CI logs instead of extrapolating from version names.
+
+- **Pair Core and pytest fixtures exactly.** In the observed environment,
+  `pytest-homeassistant-custom-component==0.13.374` required Home Assistant
+  `2026.10.3`, while the official `pytest-homeassistant==2026.11.0`
+  required Home Assistant `2026.11.0`. Combining either with `2026.11.1`
+  failed pip dependency resolution. Use separate version-pinned requirements
+  files and clean Python 3.14 environments. Never work around this contract
+  using `--no-deps`, weakened pins or disabled `pip check`. Verify an updated
+  matching fixture release before testing a newer patch version.
+- **Do not load competing pytest fixture plugins together.** The minimum and
+  baseline environments use `pytest-homeassistant-custom-component`;
+  2026.11 uses official `pytest-homeassistant`. Import
+  `MockConfigEntry` via `tests/ha_test_support.py` and keep that helper in
+  Ruff lint/format coverage. Do not silently convert the older test matrices
+  to a newer fixture implementation.
+- **Initialize Home Assistant before pytest plugin discovery when required.**
+  Home Assistant 2026.11 initializes `httpx2.alias_httpx()`; if a pytest
+  plugin imports legacy `httpx` first, startup fails with
+  `RuntimeError: httpx was already imported`. In that pinned environment use
+  the documented `python -c 'import homeassistant; import pytest;
+  raise SystemExit(pytest.main(["-q"]))'` entry point. Preserve the usual
+  `python -m pytest -q` command on older versions. Re-evaluate the workaround
+  whenever Home Assistant or pytest fixtures change.
+- **Prove compatibility rather than inferring it.** A release-month label,
+  manifest version or successfully installed dependency is not enough.
+  Require `python -m pip check`, a direct installed-Core version assertion,
+  the complete tests, Ruff lint **and** format, HACS and hassfest on the same
+  final PR head. HA 2026.11.0 was confirmed with 601 passing synthetic tests;
+  HA 2026.11.1 was not independently tested. Keep these distinctions explicit
+  in PR descriptions and release notes.
+- **Report warnings and their provenance, not just the pass count.** The
+  2026.11.0 run showed six upstream/third-party warnings: an early `anyio`
+  import preventing pytest assertion rewriting, a Home Assistant aiohttp
+  inheritance deprecation, and four `backoff` uses of deprecated
+  `asyncio.iscoroutinefunction`. Record and track such warnings; do not
+  automatically treat them as integration regressions or silence them solely
+  to make CI look clean.
+- **Preserve compatibility contracts and release boundaries.** Adding a newer
+  test matrix must not automatically raise `hacs.json`'s minimum Home
+  Assistant version or the integration's `manifest.json` version. Update those
+  only when the actual runtime/API contract or authorized release requires it.
+  Green mock-based CI is not live Brink account or physical-device validation.
 
 ## CI/CD and dependency agreements
 
