@@ -10,7 +10,6 @@ from aiohttp import ClientConnectionError, ClientResponseError
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
-from tests.ha_test_support import MockConfigEntry
 
 from custom_components.brink_ventilation.const import DOMAIN
 from custom_components.brink_ventilation.coordinator import BrinkCoordinator
@@ -18,6 +17,7 @@ from custom_components.brink_ventilation.core.brink_home_cloud import (
     BrinkApiError,
     BrinkAuthError,
 )
+from tests.ha_test_support import MockConfigEntry
 
 
 def _create_coordinator(hass: HomeAssistant) -> BrinkCoordinator:
