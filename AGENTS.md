@@ -177,7 +177,7 @@ python -m pytest -q
 
 That file pins Home Assistant `2026.7.0` and its matching fixture package. Use
 separate environments for `requirements_test.txt` (`2026.10.3`) and
-`requirements_test_2026_11.txt` (`2026.11.1`), which uses the official
+`requirements_test_2026_11.txt` (`2026.11.0`), which uses the official
 `pytest-homeassistant` plugin. Verify `pip check` and the actual installed
 Home Assistant version in each environment.
 
@@ -302,7 +302,7 @@ The checked-in workflows run on pull requests targeting `master`, pushes to
 
 | Workflow | Checks |
 | --- | --- |
-| `.github/workflows/ci.yml` | Python 3.14 pytest matrix for Home Assistant `2026.7.0`, `2026.10.3`, and `2026.11.1`, dependency consistency/version checks, and the Ruff commands above |
+| `.github/workflows/ci.yml` | Python 3.14 pytest matrix for Home Assistant `2026.7.0`, `2026.10.3`, and `2026.11.0`, dependency consistency/version checks, and the Ruff commands above |
 | `.github/workflows/hacs.yml` | HACS integration packaging without PR comments |
 | `.github/workflows/hassfest.yml` | Full upstream Home Assistant integration validation, including applicable translation schemas |
 
