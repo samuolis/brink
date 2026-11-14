@@ -33,3 +33,26 @@ Update `select.select_option` calls to pass the new option key and
 instead of `Manual`. Update state triggers and template comparisons in the same
 way. Check the entity's current options in Developer Tools after reloading the
 integration.
+
+## Existing entity registry IDs
+
+The two original binary sensors keep their upstream registry identifiers:
+`brink_ventilation_<system_id>_online` (gateway connectivity) and
+`brink_ventilation_<system_id>_filter_status_binary_sensor` (filter warning).
+No duplicate replacement entities are expected solely because of upgrading
+from the original integration. The original level-based fan also retains its
+historical `..._fan` identity.
+
+If an intermediate development version registered a temporary binary-sensor
+ID, inspect Home Assistant's entity registry before renaming anything. This
+change does **not** automatically delete or rename user-customized entries.
+
+Only parameters for which Brink explicitly reports read/write access can be
+changed via fan, number, or select actions. Unsupported permissions, invalid
+vendor IDs, and non-finite or out-of-range numeric settings are rejected
+before any cloud write; existing valid raw options (including negative vendor
+values) remain supported.
+
+Private raw portal parameter fields are no longer duplicated into diagnostic
+entity attributes. Operational state, alert entities, availability and
+recognized diagnostic categories remain exposed.
