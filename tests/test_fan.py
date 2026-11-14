@@ -465,7 +465,9 @@ def test_legacy_level_fan_unique_id_is_preserved() -> None:
     assert airflow_fan.unique_id != level_fan.unique_id
 
 
-@pytest.mark.parametrize(("airflow", "expected_on"), [(0, False), (1, True), (30, True)])
+@pytest.mark.parametrize(
+    ("airflow", "expected_on"), [(0, False), (1, True), (30, True)]
+)
 def test_level_zero_airflow_is_not_necessarily_off(
     airflow: int, expected_on: bool
 ) -> None:
@@ -491,7 +493,9 @@ def test_level_zero_invalid_airflow_is_unknown(invalid_value: object) -> None:
 
 async def test_continuous_turn_off_writes_zero_airflow() -> None:
     """Reset the level-zero airflow setpoint when switching the fan off."""
-    client, coordinator = _client_and_coordinator({101: _device(capacity=300, level="0")})
+    client, coordinator = _client_and_coordinator(
+        {101: _device(capacity=300, level="0")}
+    )
     fan = BrinkHomeVentilationFanEntity(client, coordinator, 101)
     fan.async_write_ha_state = MagicMock()
     await fan.async_turn_off()
