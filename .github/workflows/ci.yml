@@ -74,7 +74,7 @@ jobs:
             requirements: requirements_test_minimum.txt
           - home-assistant: "2026.10.3"
             requirements: requirements_test.txt
-          - home-assistant: "2026.11.1"
+          - home-assistant: "2026.11.0"
             requirements: requirements_test_2026_11.txt
     steps:
       - name: Check out repository
