@@ -114,6 +114,7 @@ def _collision_parameter(
                                 "value": "1",
                                 "valueId": 123,
                                 "valueState": 1,
+                                "readWrite": 3,
                                 "listItems": [
                                     {"value": "0", "text": labels[0]},
                                     {"value": "1", "text": labels[1]},
