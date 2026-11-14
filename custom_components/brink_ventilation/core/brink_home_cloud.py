@@ -162,7 +162,6 @@ class BrinkHomeCloud:
         async with response:
             payload = cast(dict[str, object], await response.json())
 
-        _LOGGER.debug("Brink user payload: %s", payload)
 
         return payload
 
@@ -187,7 +186,6 @@ class BrinkHomeCloud:
         async with response:
             payload = cast(dict[str, object], await response.json())
 
-        _LOGGER.debug("Brink user general response: %s", payload)
 
         return payload
 
@@ -356,7 +354,6 @@ class BrinkHomeCloud:
         finally:
             await response.release()
 
-        _LOGGER.debug("Brink Flair system payload: %s", payload)
 
         items = payload.get("items")
         if not isinstance(items, list):
@@ -403,19 +400,6 @@ class BrinkHomeCloud:
 
             systems.append(system)
 
-            _LOGGER.debug(
-                "Brink Flair system [%s] properties: %s",
-                system_id,
-                system,
-            )
-            _LOGGER.info(
-                "Brink Flair system %s access_level=%s owner=%s is_system_owner=%s editable=%s",
-                system_id,
-                item.get("accessLevel"),
-                item.get("ownerGroupName"),
-                item.get("isSystemOwner"),
-                item.get("isEditable"),
-            )
 
         return systems
 
@@ -426,7 +410,6 @@ class BrinkHomeCloud:
         )
         try:
             payload = await response.json()
-            _LOGGER.debug("Brink Flair device payload: %s", payload)
         finally:
             await response.release()
 
@@ -439,7 +422,6 @@ class BrinkHomeCloud:
         )
         try:
             payload = await response.json()
-            _LOGGER.debug("Brink Flair device_data payload: %s", payload)
         finally:
             await response.release()
 
@@ -463,13 +445,11 @@ class BrinkHomeCloud:
                 for value_id, value in params
             ]
         }
-        _LOGGER.debug("Brink Flair write payload: %s", payload)
         response = await self._api_request(
             "PUT",
             f"{API_V1_URL}systems/{system_id}/parameter-values",
             json_data=payload,
         )
-        _LOGGER.debug("Brink Flair device_data response: %s", response)
         try:
             await response.read()
         finally:
@@ -486,7 +466,6 @@ class BrinkHomeCloud:
         async with response:
             payload = cast(dict[str, object], await response.json())
 
-        _LOGGER.debug("Brink settings payload: %s", payload)
 
         return payload
 
@@ -524,12 +503,7 @@ class BrinkHomeCloud:
         """Perform an authenticated v1.1 API request."""
         max_attempts = 3
 
-        _LOGGER.debug(
-            "Brink request %s %s timeout=%s",
-            method,
-            url,
-            self._timeout,
-        )
+        _LOGGER.debug("Brink request method=%s timeout=%s", method, self._timeout)
 
         for attempt in range(max_attempts):
             await self._ensure_token()
@@ -571,8 +545,7 @@ class BrinkHomeCloud:
                     await response.release()
 
                     raise BrinkApiError(
-                        f"HTTP {err.status}: "
-                        f"{err.message or 'HTTP request failed'}",
+                        f"HTTP {err.status}: HTTP request failed",
                         error_code=err.status,
                         error_type="http",
                     ) from err
@@ -587,19 +560,14 @@ class BrinkHomeCloud:
 
             except ClientConnectorError as err:
                 self.api_is_online = False
-                self.api_error = str(err)
+                self.api_error = "Brink API connection failed"
                 self.api_error_code = None
                 self.api_error_type = "connection"
 
-                _LOGGER.warning(
-                    "Brink connection/DNS error: %s %s (%s)",
-                    method,
-                    url,
-                    err,
-                )
+                _LOGGER.warning("Brink connection/DNS failure: %s", type(err).__name__)
 
                 raise BrinkApiError(
-                    f"Unable to connect to Brink API: {method} {url}"
+                    "Unable to connect to Brink API"
                 ) from err
 
             except (
@@ -609,32 +577,29 @@ class BrinkHomeCloud:
             ) as err:
                 if attempt < max_attempts - 1:
                     _LOGGER.debug(
-                        "Brink request failed (%s/%s): %s %s (%s)",
+                        "Brink request failed (%s/%s): method=%s error_type=%s",
                         attempt + 1,
                         max_attempts,
                         method,
-                        url,
-                        err,
+                        type(err).__name__,
                     )
                 else:
                     _LOGGER.warning(
-                        "Brink request failed (%s/%s): %s %s (%s)",
+                        "Brink request failed (%s/%s): method=%s error_type=%s",
                         attempt + 1,
                         max_attempts,
                         method,
-                        url,
-                        err,
+                        type(err).__name__,
                     )
 
                 if attempt == max_attempts - 1:
                     self.api_is_online = False
-                    self.api_error = str(err)
+                    self.api_error = "Brink API connection failed"
                     self.api_error_code = None
                     self.api_error_type = "connection"
 
                     raise BrinkApiError(
-                        f"Brink request failed after {max_attempts} attempts: "
-                        f"{method} {url}"
+                        f"Brink request failed after {max_attempts} attempts"
                     ) from err
 
                 await asyncio.sleep(2)
@@ -789,7 +754,6 @@ class BrinkHomeCloud:
                     f"OIDC token exchange failed with status {response.status}"
                 )
             payload = await response.json()
-            _LOGGER.debug("Brink Flair code_for_tokens payload: %s", payload)
             await response.release()
 
         access_token = payload.get("access_token")
@@ -912,12 +876,7 @@ class BrinkHomeCloud:
                         key = f"unknown_{numeric_id}"
 
                     if key.startswith("unknown_"):
-                        _LOGGER.info(
-                            "Unknown parameter id=%s name=%s value=%s",
-                            numeric_id,
-                            raw_name,
-                            param.get("value"),
-                        )
+                        _LOGGER.debug("Unmapped Brink parameter encountered")
 
                     list_items = param.get("listItems") or []
 
