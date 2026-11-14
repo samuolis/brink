@@ -9,7 +9,7 @@ from aiohttp import ClientConnectionError, ClientResponseError
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import UpdateFailed
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from tests.ha_test_support import MockConfigEntry
 
 from custom_components.brink_ventilation import async_setup_entry, async_unload_entry
 from custom_components.brink_ventilation.const import (
