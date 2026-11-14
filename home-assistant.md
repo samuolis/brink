@@ -15,9 +15,9 @@ decoders also exist, but the active config flow does not select a local transpor
 Python 3.14 is the development target. Home Assistant `2026.7.0` is the declared
 minimum, providing the `UnitOfRatio.PARTS_PER_MILLION` API used by CO₂ entities.
 The minimum-version test requirements and the `2026.10.3` baseline have matching
-fixture packages; the `2026.11.1` compatibility environment pins the Core
-version explicitly alongside the latest verified custom-component test fixtures.
-Run all three environments for compatibility changes as described in `AGENTS.md`.
+fixture packages; the `2026.11.1` compatibility environment uses the official
+`pytest-homeassistant` fixtures in a separate, pinned environment. Run all
+three environments for compatibility changes as described in `AGENTS.md`.
 Recheck official APIs when changing lifecycle, flows, entities,
 or dependencies, and update the minimum, tests, and user-facing requirements
 together when introducing a newer API.
