@@ -46,8 +46,8 @@ def _device(
         sw_version=None,
         alerts=[],
         parameters={
-            PARAM_VENTILATION_LEVEL: {"value": level, "value_id": 2000},
-            PARAM_OPERATING_MODE: {"value": "0", "value_id": 2001},
+            PARAM_VENTILATION_LEVEL: {"value": level, "value_id": 2000, "read_write": 3},
+            PARAM_OPERATING_MODE: {"value": "0", "value_id": 2001, "read_write": 3},
             "ventilation_mode_0_airflow": {
                 "value": "50",
                 "min_value": 0,
@@ -455,9 +455,9 @@ def test_level_dependent_state(
         assert attributes["airflow"] == expected_airflow
     assert attributes["airflow_setpont"] == 75
     if level_parameter is not None:
-        assert attributes["name"] == "Ventilation level"
-        assert attributes["default_value"] == "1"
-        assert attributes["raw_options"] == ["Low"]
+        assert "name" not in attributes
+        assert "default_value" not in attributes
+        assert "raw_options" not in attributes
 
 
 def test_legacy_level_fan_unique_id_is_preserved() -> None:
