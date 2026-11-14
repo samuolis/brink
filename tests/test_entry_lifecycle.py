@@ -171,4 +171,64 @@ async def test_initial_refresh_failure_closes_transport_without_forwarding() -> 
 
     assert captured_error.value is refresh_error
     client.close.assert_awaited_once()
+    assert entry.entry_id not in hass.data.get(DOMAIN, {})
     hass.config_entries.async_forward_entry_setups.assert_not_awaited()
+
+
+async def test_first_refresh_cancellation_does_not_leave_runtime() -> None:
+    """Propagate task cancellation while closing the owned cloud transport."""
+    from asyncio import CancelledError
+
+    hass = _mock_hass()
+    entry = _mock_config_entry()
+    client = _mock_client()
+    coordinator = MagicMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock(
+        side_effect=CancelledError()
+    )
+    with (
+        patch(
+            "custom_components.brink_ventilation.BrinkHomeCloud",
+            return_value=client,
+        ),
+        patch(
+            "custom_components.brink_ventilation.BrinkCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.brink_ventilation.async_get_clientsession"),
+        pytest.raises(CancelledError),
+    ):
+        await async_setup_entry(hass, entry)
+
+    client.close.assert_awaited_once()
+    assert entry.entry_id not in hass.data.get(DOMAIN, {})
+    hass.config_entries.async_forward_entry_setups.assert_not_awaited()
+
+
+async def test_failed_platform_forwarding_cleans_up_owned_runtime() -> None:
+    """Do not retain a closed client after Home Assistant fails to set up a platform."""
+    hass = _mock_hass()
+    entry = _mock_config_entry()
+    client = _mock_client()
+    coordinator = MagicMock()
+    coordinator.async_config_entry_first_refresh = AsyncMock()
+    platform_error = RuntimeError("synthetic platform setup error")
+    hass.config_entries.async_forward_entry_setups.side_effect = platform_error
+
+    with (
+        patch(
+            "custom_components.brink_ventilation.BrinkHomeCloud",
+            return_value=client,
+        ),
+        patch(
+            "custom_components.brink_ventilation.BrinkCoordinator",
+            return_value=coordinator,
+        ),
+        patch("custom_components.brink_ventilation.async_get_clientsession"),
+        pytest.raises(RuntimeError) as caught,
+    ):
+        await async_setup_entry(hass, entry)
+
+    assert caught.value is platform_error
+    client.close.assert_awaited_once()
+    assert entry.entry_id not in hass.data[DOMAIN]
