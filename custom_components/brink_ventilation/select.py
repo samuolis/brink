@@ -36,6 +36,10 @@ from .const import (
     VALUE_STATE_MAP,
 )
 from .core.option_mapping import build_option_state_map
+from .core.parameter_validation import (
+    redacted_parameter_attributes,
+    writable_value_id,
+)
 from .entity import BrinkHomeDeviceEntity
 
 if TYPE_CHECKING:
@@ -282,7 +286,8 @@ class BrinkHomeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
         """Write a value to the Brink device."""
         param = self.data
 
-        if param is None or param.get("value_id") is None:
+        value_id = writable_value_id(param)
+        if value_id is None:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="parameter_unavailable",
@@ -291,7 +296,7 @@ class BrinkHomeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
 
         await self.client.write_parameters(
             self.system_id,
-            [(int(param["value_id"]), value)],
+            [(value_id, value)],
         )
 
         param["value"] = value
@@ -379,7 +384,7 @@ class BrinkHomeSelectEntity(BrinkHomeDeviceEntity, SelectEntity):
             # else:
             #    attributes[key] = "unavailable"
 
-        return attributes
+        return redacted_parameter_attributes(attributes)
 
     @property
     def unique_id(self) -> str:
