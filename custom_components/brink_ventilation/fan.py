@@ -461,8 +461,9 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
     async def _async_write_level(self, level_value: str) -> None:
         """Write an authorized ventilation level and optional manual mode."""
         self._require_writable_level_control()
-        ventilation_id = writable_value_id(self.data)
-        assert ventilation_id is not None
+        ventilation = self.data
+        ventilation_id = writable_value_id(ventilation)
+        assert ventilation_id is not None and ventilation is not None
         params: list[tuple[int, str]] = []
         mode = self._parameters.get(PARAM_OPERATING_MODE)
         if isinstance(mode, dict):
