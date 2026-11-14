@@ -166,6 +166,16 @@ helper without changing integration behavior. Inspect the resolved versions,
 and verify `pip check` rather than assuming the installed Core version.
 `pytest.ini` sets `asyncio_mode = auto`; retain proper async fixture handling.
 
+When running the Home Assistant 2026.11 environment, import Core before pytest
+discovers plugins so its `httpx2` compatibility alias is initialized before any
+plugin imports `httpx`. Use the same entry point as the CI job:
+
+```shell
+python -c 'import homeassistant; import pytest; raise SystemExit(pytest.main(["-q"]))'
+```
+
+The 2026.7.0 and 2026.10.3 environments continue using `python -m pytest -q`.
+
 The declared Home Assistant minimum is `2026.7.0`. When changing compatibility or
 Home Assistant APIs, run the complete suite in a separate clean Python 3.14
 environment using the minimum-version requirements:
