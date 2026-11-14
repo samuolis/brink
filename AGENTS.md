@@ -218,6 +218,63 @@ merely repeat implementation details. For documentation-only edits, validate
 links, commands, factual claims, and the diff; run behavior tests when code or
 test fixtures also change.
 
+## Regression lessons from November 2026 Brink reviews
+
+These checks came from the follow-up to
+[samuolis/brink#37](https://github.com/samuolis/brink/pull/37) and the focused
+[security/fan](https://github.com/HiDiHo01/brink/pull/17) and
+[lifecycle/coordinator](https://github.com/HiDiHo01/brink/pull/18) PRs.
+Apply them to related changes; an open PR or a passing synthetic test is not
+proof that physical-device behavior has been verified.
+
+- **Keep existing fan identities stable.** When splitting a fan into discrete
+  level and continuous-airflow entities, keep the original `..._fan` unique ID
+  on the equivalent legacy entity. Give the new entity a distinct ID. Test
+  registry identity and the absence of duplicate IDs; otherwise implement an
+  explicit, tested migration before changing existing identifiers.
+- **Do not equate level zero with zero airflow for every fan.** A positive
+  level-zero setpoint may still move air. Continuous-airflow `is_on` and
+  `turn_off` must agree with the device's validated airflow and actual
+  writes; preserve discrete-level semantics and the external `CN1` guard.
+  Test positive, zero, missing, invalid, and recovery cases, including the
+  exact commands issued when turning the continuous fan off.
+- **Do not silently clamp an airflow request.** Read each writable mode's
+  `min_value`, `max_value` and `value_id` from the *current* device
+  snapshot; validate numeric types and finiteness and select a mode that
+  actually supports the requested m³/h. Reject unsupported targets before
+  any partial write. Include asymmetric level limits, different capacities,
+  valid zero and missing metadata in regression tests. Preserve the declared
+  service range unless a documented schema change accompanies it.
+- **Exercise privacy at the log boundary.** OAuth token responses, account
+  and owner-group fields, raw system/device payloads, serial numbers, private
+  URLs and raw upstream exception text must not reach INFO *or* DEBUG logs.
+  Assert this with synthetic sentinel values and `caplog`; keep diagnostic
+  messages useful through safe error categories, counts and HTTP statuses.
+- **Test setup and polling failure ownership separately.** Verify failed
+  login, HTTP 401 versus retryable HTTP/connection/timeout failures, the
+  initial coordinator refresh, successful recovery, and `CancelledError`
+  propagation. Assert that failures do not forward platforms or leave
+  orphaned entry runtime state, that owned clients close on failed setup,
+  and that an unsuccessful platform unload retains the live runtime/client.
+  Prefer a real coordinator and Home Assistant fixtures for state behavior;
+  mock only network and external service boundaries where practical.
+- **Run both Ruff phases on new Python tests.** With Ruff 0.17.3 and Python
+  3.14, prefer built-in `TimeoutError` over its `asyncio` alias (UP041)
+  and combine nested context managers (SIM117). Passing
+  `ruff check` does *not* imply `ruff format --check` passes. Apply the
+  formatter, then rerun both checks rather than weakening the gate.
+- **Trust only checks for the current PR head.** Success on a previous commit
+  is stale after a push, and GitHub concurrency can cancel superseded runs.
+  Confirm Ruff, both declared HA test versions, HACS and hassfest for the exact
+  head SHA. Report test counts from job logs, distinguish mocked versus live
+  verification, and mark skipped/pending jobs accurately.
+- **Handle fork-to-upstream PRs deliberately.** If an upstream PR's head is the
+  fork's `master`, prepare corrections in a separate fork branch and review
+  them against that fork's `master`. Merging the corrective PR there updates
+  the existing upstream PR; merely opening it does not. A GitHub 403
+  permission error is not a published review. Do not merge, force-rebase or
+  claim an upstream update without verification and authorization.
+
 ## CI/CD and dependency agreements
 
 The checked-in workflows run on pull requests targeting `master`, pushes to
