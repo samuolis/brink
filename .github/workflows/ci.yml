@@ -43,8 +43,10 @@ jobs:
           tests/test_fan.py
           tests/test_coordinator_lifecycle.py
           tests/test_entry_lifecycle.py
+          tests/test_issue20_hardening.py
           custom_components/brink_ventilation/fan.py
           custom_components/brink_ventilation/core/option_mapping.py
+          custom_components/brink_ventilation/core/parameter_validation.py
       - name: Check maintained regression formatting
         run: >-
           python -m ruff format --check
@@ -54,7 +56,9 @@ jobs:
           tests/test_fan.py
           tests/test_coordinator_lifecycle.py
           tests/test_entry_lifecycle.py
+          tests/test_issue20_hardening.py
           custom_components/brink_ventilation/core/option_mapping.py
+          custom_components/brink_ventilation/core/parameter_validation.py
 
   tests:
     name: Tests (HA ${{ matrix.home-assistant }})
