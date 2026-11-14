@@ -12,7 +12,12 @@ from custom_components.brink_ventilation.binary_sensor import (
     BINARY_SENSOR_DESCRIPTIONS,
     BrinkHomeBinarySensorEntity,
 )
-from custom_components.brink_ventilation.const import DOMAIN, PARAM_FILTER_STATUS
+from custom_components.brink_ventilation.const import (
+    DATA_CLIENT,
+    DATA_COORDINATOR,
+    DOMAIN,
+    PARAM_FILTER_STATUS,
+)
 from custom_components.brink_ventilation.core.parameter_validation import (
     finite_parameter_bounds,
     is_parameter_writable,
@@ -306,7 +311,7 @@ async def test_unknown_vendor_fields_are_not_logged(
     entry = MagicMock(entry_id="synthetic-entry")
     hass = MagicMock()
     hass.data = {
-        DOMAIN: {entry.entry_id: {"client": client, "coordinator": coordinator}}
+        DOMAIN: {entry.entry_id: {DATA_CLIENT: client, DATA_COORDINATOR: coordinator}}
     }
     with caplog.at_level(logging.DEBUG):
         await async_setup_entry(hass, entry, MagicMock())
