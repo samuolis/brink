@@ -74,6 +74,20 @@ _PRIVATE_ATTRIBUTES = frozenset(
         "raw_options",
         "raw_value",
         "unit_of_measure",
+        "raw_value_state",
+        "raw_control_type",
+        "raw_read_write",
+    }
+)
+
+_NUMERIC_DIAGNOSTIC_ATTRIBUTES = frozenset(
+    {
+        "min_value",
+        "max_value",
+        "step_width",
+        "decimals",
+        "airflow",
+        "airflow_setpont",
     }
 )
 
@@ -81,9 +95,21 @@ _PRIVATE_ATTRIBUTES = frozenset(
 def redacted_parameter_attributes(
     attributes: dict[str, object],
 ) -> dict[str, object]:
-    """Omit private portal payload fields, retaining safe diagnostic categories."""
-    return {
-        key: value
-        for key, value in attributes.items()
-        if key not in _PRIVATE_ATTRIBUTES
-    }
+    """Keep safe numeric/enum diagnostics without leaking raw portal fields."""
+    result: dict[str, object] = {}
+    for key, value in attributes.items():
+        if key in _PRIVATE_ATTRIBUTES:
+            continue
+        if key in _NUMERIC_DIAGNOSTIC_ATTRIBUTES:
+            if isinstance(value, bool):
+                continue
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if not isfinite(numeric_value):
+                continue
+            result[key] = value if isinstance(value, (int, float)) else numeric_value
+        else:
+            result[key] = value
+    return result
