@@ -15,7 +15,7 @@ decoders also exist, but the active config flow does not select a local transpor
 Python 3.14 is the development target. Home Assistant `2026.7.0` is the declared
 minimum, providing the `UnitOfRatio.PARTS_PER_MILLION` API used by CO₂ entities.
 The minimum-version test requirements and the `2026.10.3` baseline have matching
-fixture packages; the `2026.11.1` compatibility environment uses the official
+fixture packages; the `2026.11.0` compatibility environment uses the official
 `pytest-homeassistant` fixtures in a separate, pinned environment. Run all
 three environments for compatibility changes as described in `AGENTS.md`.
 Recheck official APIs when changing lifecycle, flows, entities,
@@ -222,7 +222,7 @@ introduced.
 | Formal quality status | No `quality_scale.yaml` or evidence of completed Bronze/Silver/Gold/Platinum requirements |
 | Runtime data | Uses `hass.data`; typed `ConfigEntry.runtime_data` migration remains separate work |
 | Client boundary | Cloud client is embedded in the integration; async dependency and transport contracts need explicit evaluation |
-| Compatibility | Minimum `2026.7.0`, baseline `2026.10.3`, and new `2026.11.1` use separate pinned test environments; physical device coverage and future releases need separate evidence |
+| Compatibility | Minimum `2026.7.0`, baseline `2026.10.3`, and new `2026.11.0` use separate pinned test environments; physical device coverage and future releases need separate evidence |
 | Automated verification | Python 3.14 pytest matrix, scoped Ruff, HACS, and hassfest workflows exist; repository-wide strict typing remains separate work |
 | Workflow supply chain | Action references are pinned; upstream HACS/hassfest validator images remain rolling and can introduce new rules |
 | Lifecycle coverage | Existing tests do not establish comprehensive config-flow/setup/unload, auth-retry, or physical-device coverage |
