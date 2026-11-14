@@ -202,6 +202,16 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
         return max_airflow
 
     @staticmethod
+    def _is_airflow_writable(parameter: dict[str, object]) -> bool:
+        """Require explicit vendor write access before selecting or writing airflow."""
+        access = parameter.get("read_write")
+        return (
+            isinstance(access, int)
+            and not isinstance(access, bool)
+            and READ_WRITE_MAP.get(access) == "read-write"
+        )
+
+    @staticmethod
     def _validated_airflow_bounds(
         parameter: dict[str, object],
     ) -> tuple[float, float] | None:
@@ -237,7 +247,9 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
 
         for level in range(preferred_level, 4):
             parameter = self._parameters.get(f"ventilation_mode_{level}_airflow")
-            if not isinstance(parameter, dict):
+            if not isinstance(parameter, dict) or not self._is_airflow_writable(
+                parameter
+            ):
                 continue
             limits = self._validated_airflow_bounds(parameter)
             value_id = parameter.get("value_id")
@@ -364,7 +376,11 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
             f"ventilation_mode_{level}_airflow"
         )
 
-        if parameter is None or parameter.get("value_id") is None:
+        if (
+            not isinstance(parameter, dict)
+            or not self._is_airflow_writable(parameter)
+            or parameter.get("value_id") is None
+        ):
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="airflow_parameter_unavailable",
@@ -769,7 +785,8 @@ class BrinkHomeVentilationFanEntity(BrinkHomeBaseFanEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         """Zero the level-zero airflow setting when switching this fan off."""
-        await self.async_set_airflow(0)
+        await self._set_airflow_for_level(0, 0)
+        await self._async_write_level("0")
 
 
 class BrinkHomeLevelFanEntity(BrinkHomeBaseFanEntity):

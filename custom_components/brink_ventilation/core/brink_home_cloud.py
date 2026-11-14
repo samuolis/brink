@@ -548,7 +548,7 @@ class BrinkHomeCloud:
                         f"HTTP {err.status}: HTTP request failed",
                         error_code=err.status,
                         error_type="http",
-                    ) from err
+                    ) from None
 
                 # The complete HTTP request was successful.
                 self.api_is_online = True
@@ -568,7 +568,7 @@ class BrinkHomeCloud:
 
                 raise BrinkApiError(
                     "Unable to connect to Brink API"
-                ) from err
+                ) from None
 
             except (
                 ClientConnectionError,
@@ -600,7 +600,7 @@ class BrinkHomeCloud:
 
                     raise BrinkApiError(
                         f"Brink request failed after {max_attempts} attempts"
-                    ) from err
+                    ) from None
 
                 await asyncio.sleep(2)
 

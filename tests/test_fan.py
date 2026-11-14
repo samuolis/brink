@@ -52,24 +52,28 @@ def _device(
                 "value": "50",
                 "min_value": 0,
                 "max_value": capacity,
+                "read_write": 3,
                 "value_id": 1000,
             },
             "ventilation_mode_1_airflow": {
                 "value": "100",
                 "min_value": 0,
                 "max_value": capacity,
+                "read_write": 3,
                 "value_id": 1001,
             },
             "ventilation_mode_2_airflow": {
                 "value": "200",
                 "min_value": 0,
                 "max_value": capacity,
+                "read_write": 3,
                 "value_id": 1002,
             },
             "ventilation_mode_3_airflow": {
                 "value": capacity,
                 "min_value": 0,
                 "max_value": capacity,
+                "read_write": 3,
                 "value_id": 1003,
             },
         },
@@ -552,4 +556,41 @@ async def test_invalid_percentage_is_rejected(invalid_percent: object) -> None:
     fan = BrinkHomeVentilationFanEntity(client, coordinator, 101)
     with pytest.raises(HomeAssistantError):
         await fan.async_set_percentage(invalid_percent)
+    client.write_parameters.assert_not_awaited()
+
+
+@pytest.mark.parametrize("access", [0, 1, None, 2, "3", True, [], 3.0])
+async def test_non_writable_airflow_is_skipped_and_rejected(access: object) -> None:
+    """Selection skips unsupported access and direct writes reject it."""
+    device = _device(capacity=300)
+    device.parameters["ventilation_mode_1_airflow"]["read_write"] = access
+    client, coordinator = _client_and_coordinator({101: device})
+    fan = BrinkHomeVentilationFanEntity(client, coordinator, 101)
+    assert fan._select_airflow_level(100) == 2
+    with pytest.raises(HomeAssistantError) as caught:
+        await fan._set_airflow_for_level(1, 100)
+    assert caught.value.translation_key == "airflow_parameter_unavailable"
+    client.write_parameters.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "invalid_metadata", ["missing", "bounds", "access", "value_id"]
+)
+async def test_turn_off_requires_valid_level_zero(invalid_metadata: str) -> None:
+    """Never substitute level one when level zero cannot accept zero airflow."""
+    device = _device(capacity=300)
+    parameter = device.parameters["ventilation_mode_0_airflow"]
+    if invalid_metadata == "missing":
+        del device.parameters["ventilation_mode_0_airflow"]
+    elif invalid_metadata == "bounds":
+        parameter["min_value"] = 1
+    elif invalid_metadata == "access":
+        parameter["read_write"] = 1
+    else:
+        parameter["value_id"] = None
+    client, coordinator = _client_and_coordinator({101: device})
+    fan = BrinkHomeVentilationFanEntity(client, coordinator, 101)
+    with pytest.raises(HomeAssistantError) as caught:
+        await fan.async_turn_off()
+    assert caught.value.translation_key == "airflow_parameter_unavailable"
     client.write_parameters.assert_not_awaited()
