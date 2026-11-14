@@ -97,7 +97,9 @@ async def test_successful_refresh_clears_previous_api_error(
             id="timeout",
         ),
         pytest.param(
-            BrinkApiError("synthetic API rejection", error_code=429, error_type="rate_limit"),
+            BrinkApiError(
+                "synthetic API rejection", error_code=429, error_type="rate_limit"
+            ),
             UpdateFailed,
             429,
             "rate_limit",
