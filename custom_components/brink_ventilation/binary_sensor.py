@@ -26,6 +26,7 @@ from .const import (
     PARAM_FILTER_STATUS,
     PARAM_RH_SENSOR_STATUS,
 )
+from .core.parameter_validation import redacted_parameter_attributes
 from .entity import BrinkHomeDeviceEntity
 from .models import BrinkAlertLevel
 
@@ -89,10 +90,12 @@ class BrinkHomeBinarySensorEntity(
     @property
     def unique_id(self) -> str:
         """Return a unique ID."""
-        return (
-            f"{DOMAIN}_{self.system_id}_"
-            f"{self.entity_description.key}"
-        )
+        key = self.entity_description.key
+        if key == "gateway_status":
+            return f"{DOMAIN}_{self.system_id}_online"
+        if key == PARAM_FILTER_STATUS:
+            return f"{DOMAIN}_{self.system_id}_{self.parameter_key}_binary_sensor"
+        return f"{DOMAIN}_{self.system_id}_{key}
 
     @property
     def icon(self) -> str | None:
@@ -194,13 +197,13 @@ class BrinkHomeBinarySensorEntity(
             if custom_attributes:
                 attributes.update(custom_attributes)
 
-        return attributes
+        return redacted_parameter_attributes(attributes)
 
     @property
     def gateway_state(self) -> int | None:
         """Return the gateway state."""
         device = self._device
-        return None if device is None else device.gateway_state
+        return None if device is None else _normalize_gateway_state(device.gateway_state)
 
     @property
     def device_is_online(self) -> bool | None:
@@ -218,8 +221,22 @@ class BrinkHomeBinarySensorEntity(
 
 
 def _debug_value(value: object) -> str:
-    """Convert a value to a debug-friendly string."""
+    """Convert a diagnostic value to a string."""
     return str(value)
+
+
+def _normalize_gateway_state(value: object) -> int | None:
+    """Accept known numeric/string states without guessing an online state."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and value in GATEWAY_STATE_LABELS:
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        for identifier, label in GATEWAY_STATE_LABELS.items():
+            if normalized in (str(identifier), label):
+                return identifier
+    return None
 
 
 def _get_blocking_error_attributes(entity: BrinkHomeBinarySensorEntity) -> dict[str, object]:
@@ -269,7 +286,11 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[BrinkBinarySensorDescription, ...] = (
         parameter_key="gateway_status",
         requires_parameter=False,
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
-        value_fn=lambda entity: entity.gateway_state == GATEWAY_STATE_ONLINE,
+        value_fn=lambda entity: (
+            None
+            if entity.gateway_state is None
+            else entity.gateway_state == GATEWAY_STATE_ONLINE
+        ),
         attr_fn=lambda entity: {
             "gateway_state": entity.gateway_state,
             "device_is_online": entity.device_is_online,
