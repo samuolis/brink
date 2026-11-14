@@ -9,7 +9,6 @@ from aiohttp import ClientConnectionError, ClientResponseError
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import UpdateFailed
-from tests.ha_test_support import MockConfigEntry
 
 from custom_components.brink_ventilation import async_setup_entry, async_unload_entry
 from custom_components.brink_ventilation.const import (
@@ -18,6 +17,7 @@ from custom_components.brink_ventilation.const import (
     DOMAIN,
 )
 from custom_components.brink_ventilation.core.brink_home_cloud import BrinkAuthError
+from tests.ha_test_support import MockConfigEntry
 
 
 def _mock_hass() -> MagicMock:
