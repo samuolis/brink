@@ -109,6 +109,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except (ClientError, asyncio.TimeoutError) as ex:
         await brink_client.close()
         raise ConfigEntryNotReady from ex
+    except asyncio.CancelledError:
+        await brink_client.close()
+        raise
 
     async def async_update_data() -> dict[int, dict[str, object]]:
         try:
@@ -129,19 +132,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         scan_interval=scan_interval,
     )
 
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {
-        DATA_CLIENT: brink_client,
-        DATA_COORDINATOR: coordinator,
-    }
-
     try:
         await coordinator.async_config_entry_first_refresh()
-    except Exception:
+    except BaseException:
+        # Release owned resources even if the task is cancelled.
         await brink_client.close()
         raise
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        DATA_CLIENT: brink_client,
+        DATA_COORDINATOR: coordinator,
+    }
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except BaseException:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        await brink_client.close()
+        raise
     return True
 
 
