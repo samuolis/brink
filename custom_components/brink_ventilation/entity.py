@@ -243,13 +243,3 @@ class BrinkHomeDeviceEntity(BrinkHomeSystemEntity):
             return None
 
 
-async def old_async_set_airflow(self, airflow: int) -> None:
-    """Set the target airflow in m³/h."""
-    await self.coordinator.async_set_airflow(self._device_id, airflow)
-    await self.coordinator.async_request_refresh()
-
-
-async def old_async_set_level(self, level: int) -> None:
-    """Set the ventilation level."""
-    await self.coordinator.async_set_level(self._device_id, level)
-    await self.coordinator.async_request_refresh()
