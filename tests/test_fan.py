@@ -46,7 +46,11 @@ def _device(
         sw_version=None,
         alerts=[],
         parameters={
-            PARAM_VENTILATION_LEVEL: {"value": level, "value_id": 2000, "read_write": 3},
+            PARAM_VENTILATION_LEVEL: {
+                "value": level,
+                "value_id": 2000,
+                "read_write": 3,
+            },
             PARAM_OPERATING_MODE: {"value": "0", "value_id": 2001, "read_write": 3},
             "ventilation_mode_0_airflow": {
                 "value": "50",
