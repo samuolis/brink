@@ -41,6 +41,8 @@ jobs:
           tests/test_translation_regressions.py
           tests/test_active_alerts.py
           tests/test_fan.py
+          tests/test_coordinator_lifecycle.py
+          tests/test_entry_lifecycle.py
           custom_components/brink_ventilation/fan.py
           custom_components/brink_ventilation/core/option_mapping.py
       - name: Check maintained regression formatting
@@ -50,6 +52,8 @@ jobs:
           tests/test_translation_regressions.py
           tests/test_active_alerts.py
           tests/test_fan.py
+          tests/test_coordinator_lifecycle.py
+          tests/test_entry_lifecycle.py
           custom_components/brink_ventilation/core/option_mapping.py
 
   tests:
