@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from enum import IntEnum
 
@@ -51,6 +52,11 @@ from .const import (
     PARAM_VENTILATION_MODE_3,
     READ_WRITE_MAP,
     VALUE_STATE_MAP,
+)
+from .core.parameter_validation import (
+    finite_parameter_bounds,
+    redacted_parameter_attributes,
+    writable_value_id,
 )
 from .entity import BrinkHomeDeviceEntity
 
@@ -519,11 +525,8 @@ class BrinkHomeNumberEntity(BrinkHomeDeviceEntity, NumberEntity):
             or param.get("value_state") == ValueState.INVALID
         ):
             _LOGGER.debug(
-                "gateway_state available: key=%s super=%s data=%s raw=%s",
+                "Brink number parameter unavailable: key=%s",
                 self.entity_description.parameter_key,
-                super().available,
-                self.data,
-                self.value,
             )
 
         if self.entity_description.parameter_key == "ventilation_percentage":
@@ -532,26 +535,26 @@ class BrinkHomeNumberEntity(BrinkHomeDeviceEntity, NumberEntity):
         if self.entity_description.parameter_key == "gateway_state":
             return True
 
-        if "co2_sensor_" in self.entity_description.parameter_key and not self.entity_description.parameter_key == "ebus_co2_sensor_status":
-            co2_sensor = int(
-                parameters.get("ebus_co2_sensor_status", {})
-                .get("value")
-            )
-            return (co2_sensor == 1)
-
-        if self.entity_description.parameter_key == "rh_sensor_sensitivity":
-            rh_sensor = int(
-                parameters.get("ebus_co2_sensor_status", {})
-                .get("value")
-            )
-            return (rh_sensor == 1)
-
-        param = self.data
+        if (
+            "co2_sensor_" in self.entity_description.parameter_key
+            or self.entity_description.parameter_key == "rh_sensor_sensitivity"
+        ):
+            sensor_status = parameters.get("ebus_co2_sensor_status")
+            if not isinstance(sensor_status, dict):
+                return False
+            raw_status = sensor_status.get("value")
+            if isinstance(raw_status, bool) or not isinstance(raw_status, (int, str)):
+                return False
+            try:
+                if int(raw_status) != 1:
+                    return False
+            except (TypeError, ValueError, OverflowError):
+                return False
 
         return (
             super().available
             and param is not None
-            and param.get("value_state") != 5
+            and param.get("value_state") != ValueState.INVALID
         )
 
     @property
@@ -611,22 +614,27 @@ class BrinkHomeNumberEntity(BrinkHomeDeviceEntity, NumberEntity):
         if param.get("list_items") != []:
             attributes["list_items"] = param.get("list_items")
 
-        return attributes
+        return redacted_parameter_attributes(attributes)
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the airflow value."""
         param = self.data
-        if param is None or param.get("value_id") is None:
+        value_id = writable_value_id(param)
+        bounds = finite_parameter_bounds(param)
+        if value_id is None or bounds is None:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="parameter_unavailable",
                 translation_placeholders={"parameter": self.parameter_name},
             )
 
-        min_value = self.native_min_value
-        max_value = self.native_max_value
-
-        if not min_value <= value <= max_value:
+        min_value, max_value = bounds
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or not min_value <= value <= max_value
+        ):
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="value_out_of_range",
@@ -637,16 +645,34 @@ class BrinkHomeNumberEntity(BrinkHomeDeviceEntity, NumberEntity):
                 },
             )
 
-        decimals = int(param.get("decimals", 0))
-
-        if decimals > 0:
-            new_value = f"{value:.{decimals}f}"
-        else:
-            new_value = str(int(round(value)))
+        raw_decimals = param.get("decimals", 0)
+        if isinstance(raw_decimals, bool):
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="parameter_unavailable",
+                translation_placeholders={"parameter": self.parameter_name},
+            )
+        try:
+            decimals = int(raw_decimals)
+        except (TypeError, ValueError, OverflowError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="parameter_unavailable",
+                translation_placeholders={"parameter": self.parameter_name},
+            ) from err
+        if not 0 <= decimals <= 6:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="parameter_unavailable",
+                translation_placeholders={"parameter": self.parameter_name},
+            )
+        new_value = (
+            f"{value:.{decimals}f}" if decimals > 0 else str(int(round(value)))
+        )
 
         await self.client.write_parameters(
             self.system_id,
-            [(int(param["value_id"]), new_value)],
+            [(value_id, new_value)],
         )
 
         param["value"] = new_value
