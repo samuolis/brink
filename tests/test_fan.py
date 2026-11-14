@@ -11,7 +11,6 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import EntityPlatform
-from tests.ha_test_support import MockConfigEntry
 
 from custom_components.brink_ventilation.const import (
     DOMAIN,
@@ -25,6 +24,7 @@ from custom_components.brink_ventilation.fan import (
     BrinkHomeVentilationFanEntity,
 )
 from custom_components.brink_ventilation.models import BrinkDeviceData
+from tests.ha_test_support import MockConfigEntry
 
 
 def _device(
