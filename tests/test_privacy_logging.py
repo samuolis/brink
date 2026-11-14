@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp import ClientConnectorError, ClientResponseError, ServerDisconnectedError
 from homeassistant.core import HomeAssistant
-from tests.ha_test_support import MockConfigEntry
 
 from custom_components.brink_ventilation.const import DOMAIN
 from custom_components.brink_ventilation.coordinator import BrinkCoordinator
 from custom_components.brink_ventilation.core.brink_home_cloud import BrinkHomeCloud
+from tests.ha_test_support import MockConfigEntry
 
 
 @pytest.mark.asyncio
