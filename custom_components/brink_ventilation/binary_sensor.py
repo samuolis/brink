@@ -95,7 +95,7 @@ class BrinkHomeBinarySensorEntity(
             return f"{DOMAIN}_{self.system_id}_online"
         if key == PARAM_FILTER_STATUS:
             return f"{DOMAIN}_{self.system_id}_{self.parameter_key}_binary_sensor"
-        return f"{DOMAIN}_{self.system_id}_{key}
+        return f"{DOMAIN}_{self.system_id}_{key}"
 
     @property
     def icon(self) -> str | None:
