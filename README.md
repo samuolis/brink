@@ -50,6 +50,21 @@ Preset lists are isolated from caller changes; an unknown ventilation level is
 not treated as level zero. Direct airflow requests retain their integer m³/h
 values instead of being rounded through a percentage conversion.
 
+## Upgrade safety and diagnostics
+
+Existing gateway-online and filter-warning binary sensors retain their
+original entity-registry unique IDs alongside the legacy level fan.
+Write actions require explicit vendor read/write permission, a valid vendor
+value ID and supported device-specific limits. Unsupported values are rejected
+without changing the cached state. Private raw parameter names, identifiers,
+values and option lists are no longer duplicated into entity attributes or
+unknown-parameter log messages. Existing entity states and alerts are retained.
+
+See [the migration guide](docs/translation-migration.md) for the original
+binary-sensor IDs, option-key changes and the diagnostic-attribute adjustments.
+All automated device interactions use synthetic test fixtures; hardware-model
+verification is separate from successful CI.
+
 ## Translations
 
 English, Dutch, and German translations are included. This update uses lowercase
