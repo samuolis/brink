@@ -179,6 +179,10 @@ def _create_entity_dependencies(
         alerts=[],
         parameters=parameters,
     )
+    # Synthetic writable fixtures must explicitly advertise vendor write access.
+    for parameter in parameters.values():
+        if parameter.get("value_id") is not None:
+            parameter.setdefault("read_write", 3)
     client = MagicMock(write_parameters=AsyncMock())
     coordinator = MagicMock(
         data={101: device},
