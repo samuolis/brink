@@ -44,6 +44,7 @@ jobs:
           tests/test_coordinator_lifecycle.py
           tests/test_entry_lifecycle.py
           tests/test_issue20_hardening.py
+          tests/ha_test_support.py
           custom_components/brink_ventilation/fan.py
           custom_components/brink_ventilation/core/option_mapping.py
           custom_components/brink_ventilation/core/parameter_validation.py
@@ -57,6 +58,7 @@ jobs:
           tests/test_coordinator_lifecycle.py
           tests/test_entry_lifecycle.py
           tests/test_issue20_hardening.py
+          tests/ha_test_support.py
           custom_components/brink_ventilation/core/option_mapping.py
           custom_components/brink_ventilation/core/parameter_validation.py
 
