@@ -21,6 +21,7 @@ from custom_components.brink_ventilation.const import (
 from custom_components.brink_ventilation.core.parameter_validation import (
     finite_parameter_bounds,
     is_parameter_writable,
+    redacted_parameter_attributes,
     writable_value_id,
 )
 from custom_components.brink_ventilation.models import BrinkDeviceData
@@ -357,3 +358,27 @@ def test_public_parameter_attributes_do_not_dump_vendor_payloads() -> None:
         assert secret not in str(attributes)
         assert "value_id" not in attributes
         assert "read_write" in attributes
+
+
+def test_malformed_vendor_diagnostic_values_are_not_exposed() -> None:
+    """Discard untrusted raw enum codes and malformed numeric metadata."""
+    private_value = "synthetic-private-attribute-secret"
+    attrs = redacted_parameter_attributes(
+        {
+            "key": "known_safe_key",
+            "value_state": "unknown",
+            "raw_value_state": private_value,
+            "raw_read_write": private_value,
+            "raw_control_type": private_value,
+            "min_value": private_value,
+            "max_value": float("nan"),
+            "airflow": private_value,
+            "airflow_setpont": 75,
+        }
+    )
+    assert private_value not in str(attrs)
+    assert attrs == {
+        "key": "known_safe_key",
+        "value_state": "unknown",
+        "airflow_setpont": 75,
+    }
