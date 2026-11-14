@@ -218,6 +218,20 @@ merely repeat implementation details. For documentation-only edits, validate
 links, commands, factual claims, and the diff; run behavior tests when code or
 test fixtures also change.
 
+## Reusable agent skills
+
+Project procedures are available as discoverable Agent Skills in `.agents/skills/`.
+Use the relevant skill for a task; `AI_POLICY.md`, this file and applicable
+specialist instructions remain authoritative.
+
+| Skill | Scope |
+| --- | --- |
+| [PR review](.agents/skills/brink-pr-review/SKILL.md) | Review findings, thread resolution and safe fork updates |
+| [Fan safety](.agents/skills/brink-fan-safety/SKILL.md) | Device writes, entity IDs and airflow behavior |
+| [Cloud privacy](.agents/skills/brink-cloud-privacy/SKILL.md) | OAuth secrets, API exceptions and private logging |
+| [Regression and CI](.agents/skills/brink-regression-ci/SKILL.md) | Synthetic test design and exact-head validation |
+
+These skills add task workflows, not new policy or proof of execution.
 ## Regression lessons from November 2026 Brink reviews
 
 These checks came from the follow-up to
