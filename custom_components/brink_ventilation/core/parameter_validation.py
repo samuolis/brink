@@ -42,7 +42,12 @@ def finite_parameter_bounds(
         return None
     lower = parameter.get("min_value")
     upper = parameter.get("max_value")
-    if lower is None or upper is None or isinstance(lower, bool) or isinstance(upper, bool):
+    if (
+        lower is None
+        or upper is None
+        or isinstance(lower, bool)
+        or isinstance(upper, bool)
+    ):
         return None
     try:
         minimum, maximum = float(lower), float(upper)
@@ -55,9 +60,20 @@ def finite_parameter_bounds(
 
 _PRIVATE_ATTRIBUTES = frozenset(
     {
-        "name", "raw_name", "value", "_raw_value", "default_value",
-        "numeric_id", "value_id", "component_id", "list_items", "options",
-        "options_str", "raw_options", "raw_value", "unit_of_measure",
+        "name",
+        "raw_name",
+        "value",
+        "_raw_value",
+        "default_value",
+        "numeric_id",
+        "value_id",
+        "component_id",
+        "list_items",
+        "options",
+        "options_str",
+        "raw_options",
+        "raw_value",
+        "unit_of_measure",
     }
 )
 
