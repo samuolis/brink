@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from asyncio import CancelledError, TimeoutError
+from asyncio import CancelledError
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -117,13 +117,15 @@ async def test_refresh_failure_classification(
     """Classify failures without publishing a successful API status."""
     coordinator = _create_coordinator(hass)
     try:
-        with patch(
-            "custom_components.brink_ventilation.coordinator.async_get_devices",
-            new_callable=AsyncMock,
-            side_effect=api_error,
+        with (
+            patch(
+                "custom_components.brink_ventilation.coordinator.async_get_devices",
+                new_callable=AsyncMock,
+                side_effect=api_error,
+            ),
+            pytest.raises(expected_exception) as captured_error,
         ):
-            with pytest.raises(expected_exception) as captured_error:
-                await coordinator._async_update_data()
+            await coordinator._async_update_data()
         assert captured_error.value.__cause__ is api_error
         assert coordinator.api_is_online is False
         assert coordinator.api_error_type == expected_type
@@ -141,13 +143,15 @@ async def test_cancelled_refresh_propagates_without_false_health_status(
     coordinator = _create_coordinator(hass)
     coordinator._set_api_online()
     try:
-        with patch(
-            "custom_components.brink_ventilation.coordinator.async_get_devices",
-            new_callable=AsyncMock,
-            side_effect=CancelledError,
+        with (
+            patch(
+                "custom_components.brink_ventilation.coordinator.async_get_devices",
+                new_callable=AsyncMock,
+                side_effect=CancelledError,
+            ),
+            pytest.raises(CancelledError),
         ):
-            with pytest.raises(CancelledError):
-                await coordinator._async_update_data()
+            await coordinator._async_update_data()
         assert coordinator.api_is_online is True
         assert coordinator.api_error is None
     finally:
