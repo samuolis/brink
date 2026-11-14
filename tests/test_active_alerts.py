@@ -12,7 +12,6 @@ import pytest
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import EntityPlatform
-from tests.ha_test_support import MockConfigEntry
 
 from custom_components.brink_ventilation.api import async_get_devices
 from custom_components.brink_ventilation.const import DOMAIN
@@ -26,6 +25,7 @@ from custom_components.brink_ventilation.sensor import (
     SENSOR_DESCRIPTIONS,
     BrinkHomeSensorEntity,
 )
+from tests.ha_test_support import MockConfigEntry
 
 _OMITTED = object()
 
