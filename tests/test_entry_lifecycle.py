@@ -71,7 +71,9 @@ def _http_error(status: int) -> ClientResponseError:
             ConfigEntryNotReady,
             id="network-failure",
         ),
-        pytest.param(TimeoutError("synthetic timeout"), ConfigEntryNotReady, id="timeout"),
+        pytest.param(
+            TimeoutError("synthetic timeout"), ConfigEntryNotReady, id="timeout"
+        ),
     ],
 )
 async def test_failed_login_closes_client_without_forwarding_platforms(
@@ -84,7 +86,9 @@ async def test_failed_login_closes_client_without_forwarding_platforms(
     client = _mock_client()
     client.login.side_effect = failure
     with (
-        patch("custom_components.brink_ventilation.BrinkHomeCloud", return_value=client),
+        patch(
+            "custom_components.brink_ventilation.BrinkHomeCloud", return_value=client
+        ),
         patch("custom_components.brink_ventilation.async_get_clientsession"),
     ):
         with pytest.raises(expected_exception) as captured_error:
@@ -104,8 +108,13 @@ async def test_successful_setup_registers_runtime_and_unloads_safely() -> None:
     coordinator = MagicMock()
     coordinator.async_config_entry_first_refresh = AsyncMock()
     with (
-        patch("custom_components.brink_ventilation.BrinkHomeCloud", return_value=client),
-        patch("custom_components.brink_ventilation.BrinkCoordinator", return_value=coordinator),
+        patch(
+            "custom_components.brink_ventilation.BrinkHomeCloud", return_value=client
+        ),
+        patch(
+            "custom_components.brink_ventilation.BrinkCoordinator",
+            return_value=coordinator,
+        ),
         patch("custom_components.brink_ventilation.async_get_clientsession"),
     ):
         assert await async_setup_entry(hass, entry) is True
@@ -149,8 +158,13 @@ async def test_initial_refresh_failure_closes_transport_without_forwarding() -> 
     coordinator.async_config_entry_first_refresh = AsyncMock(side_effect=refresh_error)
 
     with (
-        patch("custom_components.brink_ventilation.BrinkHomeCloud", return_value=client),
-        patch("custom_components.brink_ventilation.BrinkCoordinator", return_value=coordinator),
+        patch(
+            "custom_components.brink_ventilation.BrinkHomeCloud", return_value=client
+        ),
+        patch(
+            "custom_components.brink_ventilation.BrinkCoordinator",
+            return_value=coordinator,
+        ),
         patch("custom_components.brink_ventilation.async_get_clientsession"),
     ):
         with pytest.raises(UpdateFailed) as captured_error:
