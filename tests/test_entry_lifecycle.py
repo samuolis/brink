@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from asyncio import TimeoutError
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -90,9 +89,9 @@ async def test_failed_login_closes_client_without_forwarding_platforms(
             "custom_components.brink_ventilation.BrinkHomeCloud", return_value=client
         ),
         patch("custom_components.brink_ventilation.async_get_clientsession"),
+        pytest.raises(expected_exception) as captured_error,
     ):
-        with pytest.raises(expected_exception) as captured_error:
-            await async_setup_entry(hass, entry)
+        await async_setup_entry(hass, entry)
 
     assert captured_error.value.__cause__ is failure
     client.close.assert_awaited_once()
@@ -166,9 +165,9 @@ async def test_initial_refresh_failure_closes_transport_without_forwarding() -> 
             return_value=coordinator,
         ),
         patch("custom_components.brink_ventilation.async_get_clientsession"),
+        pytest.raises(UpdateFailed) as captured_error,
     ):
-        with pytest.raises(UpdateFailed) as captured_error:
-            await async_setup_entry(hass, entry)
+        await async_setup_entry(hass, entry)
 
     assert captured_error.value is refresh_error
     client.close.assert_awaited_once()
