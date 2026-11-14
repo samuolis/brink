@@ -72,6 +72,8 @@ jobs:
             requirements: requirements_test_minimum.txt
           - home-assistant: "2026.10.3"
             requirements: requirements_test.txt
+          - home-assistant: "2026.11.1"
+            requirements: requirements_test_2026_11.txt
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
