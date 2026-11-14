@@ -146,7 +146,9 @@ async def test_select_denies_non_writable_parameters(access: object) -> None:
         client,
         coordinator,
         101,
-        BrinkSelectEntityDescription(key="valve_control", parameter_key="valve_control"),
+        BrinkSelectEntityDescription(
+            key="valve_control", parameter_key="valve_control"
+        ),
     )
     with pytest.raises(HomeAssistantError) as error:
         await select._async_write_value("1")
@@ -224,7 +226,9 @@ async def test_signed_number_write_remains_valid() -> None:
     assert parameter["value"] == "-2"
 
 
-@pytest.mark.parametrize("failure", [TimeoutError("synthetic timeout"), OSError("test")])
+@pytest.mark.parametrize(
+    "failure", [TimeoutError("synthetic timeout"), OSError("test")]
+)
 async def test_failed_number_write_does_not_mutate_cache(failure: Exception) -> None:
     """A rejected/uncertain vendor write must not be published as confirmed."""
     parameter: dict[str, object] = {
@@ -243,9 +247,7 @@ async def test_failed_number_write_does_not_mutate_cache(failure: Exception) -> 
     coordinator.async_set_updated_data.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    "status", [None, "bad", True, False, 0, "0", -1, "2"]
-)
+@pytest.mark.parametrize("status", [None, "bad", True, False, 0, "0", -1, "2"])
 def test_co2_number_availability_is_safe_for_missing_status(
     status: object,
 ) -> None:
@@ -303,7 +305,9 @@ async def test_unknown_vendor_fields_are_not_logged(
     )
     entry = MagicMock(entry_id="synthetic-entry")
     hass = MagicMock()
-    hass.data = {DOMAIN: {entry.entry_id: {"client": client, "coordinator": coordinator}}}
+    hass.data = {
+        DOMAIN: {entry.entry_id: {"client": client, "coordinator": coordinator}}
+    }
     with caplog.at_level(logging.DEBUG):
         await async_setup_entry(hass, entry, MagicMock())
     for secret in (*secrets, "synthetic-private-label-secret"):
@@ -337,7 +341,9 @@ def test_public_parameter_attributes_do_not_dump_vendor_payloads() -> None:
             client,
             coordinator,
             101,
-            BrinkSelectEntityDescription(key="valve_control", parameter_key="valve_control"),
+            BrinkSelectEntityDescription(
+            key="valve_control", parameter_key="valve_control"
+        ),
         ),
         _number_sensor(client, coordinator, "bypass_temperature"),
     )
