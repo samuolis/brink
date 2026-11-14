@@ -157,11 +157,14 @@ python -m pip install -r requirements_test.txt
 python -m pytest -q
 ```
 
-The test dependency file pins `pytest-homeassistant-custom-component` and
-`async-timeout`; the fixture package determines the Home Assistant test release.
-Inspect the resolved versions rather than assuming the environment tests the
-latest Home Assistant. `pytest.ini` sets `asyncio_mode = auto`; preserve correct
-async fixture handling rather than suppressing fixture warnings.
+The 2026.7.0 and 2026.10.3 requirements pin the legacy
+`pytest-homeassistant-custom-component` fixtures. Home Assistant 2026.11
+provides the official `pytest-homeassistant` fixtures; do not install
+both pytest plugins in one environment because their fixtures overlap.
+`tests/ha_test_support.py` selects the installed package's `MockConfigEntry`
+helper without changing integration behavior. Inspect the resolved versions,
+and verify `pip check` rather than assuming the installed Core version.
+`pytest.ini` sets `asyncio_mode = auto`; retain proper async fixture handling.
 
 The declared Home Assistant minimum is `2026.7.0`. When changing compatibility or
 Home Assistant APIs, run the complete suite in a separate clean Python 3.14
@@ -174,9 +177,9 @@ python -m pytest -q
 
 That file pins Home Assistant `2026.7.0` and its matching fixture package. Use
 separate environments for `requirements_test.txt` (`2026.10.3`) and
-`requirements_test_2026_11.txt` (`2026.11.1`); the newest test environment
-explicitly pins Home Assistant because its fixture package may lag Core releases.
-Verify `pip check` and the actual installed Home Assistant version for each.
+`requirements_test_2026_11.txt` (`2026.11.1`), which uses the official
+`pytest-homeassistant` plugin. Verify `pip check` and the actual installed
+Home Assistant version in each environment.
 
 For focused localization work:
 
@@ -190,8 +193,8 @@ Ruff `0.17.3`; install that version when reproducing the tooling environment:
 ```shell
 python -m pip install ruff==0.17.3
 python -m ruff check --select E9,F63,F7,F82 custom_components tests
-python -m ruff check tests/test_translations.py tests/test_translation_regressions.py tests/test_active_alerts.py tests/test_fan.py tests/test_coordinator_lifecycle.py tests/test_entry_lifecycle.py tests/test_issue20_hardening.py custom_components/brink_ventilation/fan.py custom_components/brink_ventilation/core/option_mapping.py custom_components/brink_ventilation/core/parameter_validation.py
-python -m ruff format --check tests/test_translations.py tests/test_translation_regressions.py tests/test_active_alerts.py tests/test_fan.py tests/test_coordinator_lifecycle.py tests/test_entry_lifecycle.py tests/test_issue20_hardening.py custom_components/brink_ventilation/core/option_mapping.py custom_components/brink_ventilation/core/parameter_validation.py
+python -m ruff check tests/test_translations.py tests/test_translation_regressions.py tests/test_active_alerts.py tests/test_fan.py tests/test_coordinator_lifecycle.py tests/test_entry_lifecycle.py tests/test_issue20_hardening.py tests/ha_test_support.py custom_components/brink_ventilation/fan.py custom_components/brink_ventilation/core/option_mapping.py custom_components/brink_ventilation/core/parameter_validation.py
+python -m ruff format --check tests/test_translations.py tests/test_translation_regressions.py tests/test_active_alerts.py tests/test_fan.py tests/test_coordinator_lifecycle.py tests/test_entry_lifecycle.py tests/test_issue20_hardening.py tests/ha_test_support.py custom_components/brink_ventilation/core/option_mapping.py custom_components/brink_ventilation/core/parameter_validation.py
 git diff --check
 ```
 
