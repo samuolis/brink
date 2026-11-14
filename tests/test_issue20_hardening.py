@@ -347,8 +347,8 @@ def test_public_parameter_attributes_do_not_dump_vendor_payloads() -> None:
             coordinator,
             101,
             BrinkSelectEntityDescription(
-            key="valve_control", parameter_key="valve_control"
-        ),
+                key="valve_control", parameter_key="valve_control"
+            ),
         ),
         _number_sensor(client, coordinator, "bypass_temperature"),
     )
