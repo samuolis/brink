@@ -40,7 +40,6 @@ from .const import (
     GATEWAY_STATE_LABELS,
     GEOTHERMAL_HEAT_EXCHANGER_LABELS,
     PARAM_ACTIVE_CONTROL_STATUS,
-    PARAM_ACTUAL_SUPPLY_AIR_FLOW,
     PARAM_BYPASS_VALVE_STATUS,
     PARAM_CO2_SENSOR_1,
     PARAM_CO2_SENSOR_2,
@@ -145,15 +144,6 @@ SENSOR_DESCRIPTIONS: tuple[BrinkSensorDescription, ...] = (
         key=PARAM_SUPPLY_AIR_FLOW,
         translation_key="actual_supply_air_flow",
         parameter_key=PARAM_SUPPLY_AIR_FLOW,
-        icon="mdi:fan-chevron-up",
-        native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
-        state_class=SensorStateClass.MEASUREMENT,
-        device_class=SensorDeviceClass.VOLUME_FLOW_RATE
-    ),
-    BrinkSensorDescription(
-        key=PARAM_ACTUAL_SUPPLY_AIR_FLOW,
-        translation_key="actual_supply_air_flow",
-        parameter_key=PARAM_ACTUAL_SUPPLY_AIR_FLOW,
         icon="mdi:fan-chevron-up",
         native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
