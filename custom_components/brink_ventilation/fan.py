@@ -245,7 +245,7 @@ class BrinkHomeBaseFanEntity(BrinkHomeDeviceEntity, FanEntity):
         else:
             preferred_level = 3
 
-        for level in range(preferred_level, 4):
+        for level in range(preferred_level, 1 if airflow == 0 else 4):
             parameter = self._parameters.get(f"ventilation_mode_{level}_airflow")
             if not isinstance(parameter, dict) or not self._is_airflow_writable(
                 parameter
