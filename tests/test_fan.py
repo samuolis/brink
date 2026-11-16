@@ -512,6 +512,30 @@ async def test_continuous_turn_off_writes_zero_airflow() -> None:
     assert fan.is_on is False
 
 
+@pytest.mark.parametrize("method", ["async_set_airflow", "async_set_percentage"])
+@pytest.mark.parametrize("level_zero_writable", [False, True])
+async def test_zero_airflow_never_selects_a_higher_level(
+    method: str, level_zero_writable: bool
+) -> None:
+    """Zero requests either turn off at level zero or make no device writes."""
+    device = _device(capacity=300)
+    if not level_zero_writable:
+        device.parameters["ventilation_mode_0_airflow"]["min_value"] = 1
+    client, coordinator = _client_and_coordinator({101: device})
+    fan = BrinkHomeVentilationFanEntity(client, coordinator, 101)
+    fan.async_write_ha_state = MagicMock()
+
+    if not level_zero_writable:
+        with pytest.raises(HomeAssistantError):
+            await getattr(fan, method)(0)
+        client.write_parameters.assert_not_awaited()
+        return
+
+    await getattr(fan, method)(0)
+    assert client.write_parameters.await_args_list[0].args == (101, [(1000, "0")])
+    assert client.write_parameters.await_args_list[1].args[-1][-1] == (2000, "0")
+
+
 @pytest.mark.parametrize("as_percentage", [False, True])
 async def test_airflow_level_selection_respects_device_bounds(
     as_percentage: bool,
