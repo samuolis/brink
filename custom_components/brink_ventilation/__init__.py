@@ -2,21 +2,33 @@
 
 from __future__ import annotations
 
+# __init__.py
 import asyncio
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import Any
 
 import aiohttp
-
+import voluptuous as vol
+from aiohttp import ClientError as ClientError
+from aiohttp import ClientResponseError as ClientResponseError
+from homeassistant.components.fan import DOMAIN as FAN_DOMAIN
+from homeassistant.config import ConfigType
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME, Platform
+from homeassistant.const import (
+    CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
+    CONF_USERNAME,
+    Platform,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import service
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .api import async_get_devices
 from .const import (
     DATA_CLIENT,
     DATA_COORDINATOR,
@@ -27,13 +39,52 @@ from .const import (
     PARAM_DEVICE_TYPE,
     PARAM_SOFTWARE_LABEL,
 )
+from .coordinator import BrinkCoordinator
 from .core.brink_home_cloud import BrinkAuthError, BrinkHomeCloud
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.SELECT, Platform.BINARY_SENSOR, Platform.SENSOR, Platform.FAN]
+PLATFORMS = [Platform.SELECT, Platform.BINARY_SENSOR, Platform.SENSOR, Platform.FAN, Platform.NUMBER]
 
 CONFIG_SCHEMA = cv.removed(DOMAIN, raise_if_present=False)
+
+
+# pylint: disable=unused-argument, unnecessary-async
+async def async_setup(
+    hass: HomeAssistant,
+    _config: ConfigType,
+) -> bool:
+    """Set up the Brink Ventilation integration."""
+
+    service.async_register_platform_entity_service(
+        hass,
+        DOMAIN,
+        "set_level",
+        entity_domain=FAN_DOMAIN,
+        schema={
+            vol.Required("level"): vol.All(
+                vol.Coerce(int),
+                vol.In([0, 1, 2, 3]),
+            ),
+        },
+        func="async_set_level",
+    )
+
+    service.async_register_platform_entity_service(
+        hass,
+        DOMAIN,
+        "set_airflow",
+        entity_domain=FAN_DOMAIN,
+        schema={
+            vol.Required("airflow"): vol.All(
+                vol.Coerce(int),
+                vol.Range(min=0, max=300),
+            ),
+        },
+        func="async_set_airflow",
+    )
+
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -50,70 +101,55 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except BrinkAuthError as ex:
         await brink_client.close()
         raise ConfigEntryAuthFailed from ex
-    except aiohttp.ClientResponseError as ex:
+    except ClientResponseError as ex:
         await brink_client.close()
         if ex.status == 401:
             raise ConfigEntryAuthFailed from ex
         raise ConfigEntryNotReady from ex
-    except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
+    except (ClientError, asyncio.TimeoutError) as ex:
         await brink_client.close()
         raise ConfigEntryNotReady from ex
+    except asyncio.CancelledError:
+        await brink_client.close()
+        raise
 
-    async def async_update_data() -> dict[int, dict[str, Any]]:
+    async def async_update_data() -> dict[int, dict[str, object]]:
         try:
             return await async_get_devices(brink_client)
         except BrinkAuthError as ex:
             raise ConfigEntryAuthFailed from ex
-        except aiohttp.ClientResponseError as ex:
+        except ClientResponseError as ex:
             if ex.status == 401:
                 raise ConfigEntryAuthFailed from ex
             raise UpdateFailed(ex) from ex
-        except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
+        except (ClientError, asyncio.TimeoutError) as ex:
             raise UpdateFailed(ex) from ex
 
-    coordinator = DataUpdateCoordinator(
-        hass,
-        _LOGGER,
-        name=DOMAIN,
-        update_method=async_update_data,
-        update_interval=timedelta(seconds=scan_interval),
+    coordinator = BrinkCoordinator(
+        hass=hass,
+        config_entry=entry,
+        brink_client=brink_client,
+        scan_interval=scan_interval,
     )
-
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {
-        DATA_CLIENT: brink_client,
-        DATA_COORDINATOR: coordinator,
-    }
 
     try:
         await coordinator.async_config_entry_first_refresh()
-    except Exception:
+    except BaseException:
+        # Release owned resources even if the task is cancelled.
         await brink_client.close()
         raise
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        DATA_CLIENT: brink_client,
+        DATA_COORDINATOR: coordinator,
+    }
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except BaseException:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        await brink_client.close()
+        raise
     return True
-
-
-async def async_get_devices(brink_client: BrinkHomeCloud) -> dict[int, dict[str, Any]]:
-    """Fetch and normalize Brink systems plus the parameters this integration uses."""
-    systems = await brink_client.get_systems()
-
-    devices: dict[int, dict[str, Any]] = {}
-    for system in systems:
-        system_id = system["system_id"]
-        parameters = await brink_client.get_device_data(system_id)
-        devices[system_id] = {
-            "system_id": system_id,
-            "name": system.get("name") or DEFAULT_NAME,
-            "serial_number": system.get("serial_number"),
-            "gateway_state": system.get("gateway_state"),
-            "model": parameters.get(PARAM_DEVICE_TYPE, {}).get("value") or DEFAULT_MODEL,
-            "sw_version": parameters.get(PARAM_SOFTWARE_LABEL, {}).get("value"),
-            "parameters": parameters,
-        }
-
-    return devices
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):

@@ -15,6 +15,9 @@ Custom component for Home Assistant. This component is designed to integrate the
 
 ## Installation
 
+Requires Home Assistant **2026.7.0 or newer**. This minimum provides the
+`UnitOfRatio` API used by the CO₂ entities.
+
 You have two options for installation:
 
 ### HACS
@@ -29,9 +32,76 @@ You have two options for installation:
 - Copy "brink_home" folder to the "/config/custom_components" folder.
 - Restart HA server.
 
+## Fan state
+
+The level-based fan retains its original unique ID, preserving existing
+entity-registry links and automations after upgrading. The continuous airflow
+fan treats positive airflow at level 0 as running and clears that airflow when
+turned off. Requested airflow must fit the selected device mode's actual
+minimum and maximum; unsupported rates are rejected instead of silently clipped.
+
+When the ventilation level is missing or invalid, level-dependent airflow
+attributes are omitted. Other available fan attributes remain visible.
+
+Fan percentages use the capacity in the latest device snapshot, including after
+an initially unavailable device recovers. Missing or invalid capacity leaves the
+percentage unknown and rejects airflow writes until valid metadata arrives.
+Preset lists are isolated from caller changes; an unknown ventilation level is
+not treated as level zero. Direct airflow requests retain their integer m³/h
+values instead of being rounded through a percentage conversion.
+
+## Upgrade safety and diagnostics
+
+Existing gateway-online and filter-warning binary sensors retain their
+original entity-registry unique IDs alongside the legacy level fan.
+Write actions require explicit vendor read/write permission, a valid vendor
+value ID and supported device-specific limits. Unsupported values are rejected
+without changing the cached state. Private raw parameter names, identifiers,
+values and option lists are no longer duplicated into entity attributes or
+unknown-parameter log messages. Existing entity states and alerts are retained.
+
+See [the migration guide](docs/translation-migration.md) for the original
+binary-sensor IDs, option-key changes and the diagnostic-attribute adjustments.
+All automated device interactions use synthetic test fixtures; hardware-model
+verification is separate from successful CI.
+
+## Translations
+
+English, Dutch, and German translations are included. This update uses lowercase
+keys for enum states, select options, and fan presets. Review the
+[translation migration guide](docs/translation-migration.md) before updating
+automations or scripts that use the previous English values.
+
+If different device options normalize to the same key, that ambiguous choice is
+omitted and cannot be written. Other unambiguous options remain available.
+
+## Alert diagnostics
+
+The active-alert sensor accepts Brink's valid summary count as either an integer
+or a nested `{"alertCount": 0}` object. The value is normalized to a
+non-negative integer before publishing it to Home Assistant. If the optional
+count is missing or invalid, it counts the complete fetched list of active,
+unarchived alerts for its own system. An empty successful result is `0`;
+a failed or incomplete refresh remains unavailable until a successful update.
+
+## Development and maintenance
+
+GitHub Actions runs Python 3.14 tests against Home Assistant 2026.7.0,
+2026.10.3, and 2026.11.0, alongside scoped Ruff lint/format checks, HACS
+validation, and hassfest. The checks
+run for pull requests to `master`, pushes to `master`, weekly, or manually from
+the [Actions page](https://github.com/HiDiHo01/brink/actions). See `AGENTS.md` for
+the exact commands and validation scope.
+
+- [Repository policy](AI_POLICY.md)
+- [Contributor instructions, architecture, and checks](AGENTS.md)
+- [Localization guide](LOCALIZATION.md)
+- [Home Assistant engineering requirements](home-assistant.md)
+
 ### WORKING ON:
 - Brink Renovent 180
 - Brink Renovent 300
 - Brink Renovent 400 Plus
+- Brink Flair 300
 - Brink Flair 325
 - Please tell me, it should work with all Brink ventilation systems

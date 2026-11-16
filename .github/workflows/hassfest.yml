@@ -2,13 +2,29 @@ name: Validate with hassfest
 
 on:
   push:
+    branches: [master]
   pull_request:
+    branches: [master]
+  workflow_dispatch:
   schedule:
-    - cron:  '0 0 * * *'
+    - cron: "27 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
-    runs-on: "ubuntu-latest"
+    name: hassfest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: "actions/checkout@v3"
-      - uses: "home-assistant/actions/hassfest@master"
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate Home Assistant integration
+        uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master, verified 2026-10-27

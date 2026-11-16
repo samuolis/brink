@@ -1,0 +1,53 @@
+{
+  "services": {
+    "set_airflow": {
+      "name": "Set airflow",
+      "description": "Set the target airflow in cubic meters per hour.",
+      "fields": {
+        "airflow": {
+          "name": "Airflow",
+          "description": "Target airflow."
+        }
+      }
+    },
+    "set_level": {
+      "name": "Set ventilation level",
+      "description": "Set the Brink ventilation level.",
+      "fields": {
+        "level": {
+          "name": "Ventilation level",
+          "description": "Select the ventilation level."
+        }
+      }
+    }
+  },
+  "selector": {
+    "brink_level": {
+      "options": {
+        "0": "Off",
+        "1": "Low",
+        "2": "Medium",
+        "3": "High"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "owner_group_name": {
+        "name": "Owner group"
+      },
+      "iana_time_zone": {
+        "name": "Time zone"
+      },
+      "two_letter_country_code": {
+        "name": "Country"
+      },
+      "active_alert_count": {
+        "name": "Active alerts"
+      },
+      "access_level": {
+        "name": "Access level"
+      }
+    }
+  }
+}

@@ -1,0 +1,123 @@
+name: Python CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+  schedule:
+    - cron: "7 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Install Ruff
+        run: python -m pip install ruff==0.17.3
+      - name: Check critical Python errors
+        run: python -m ruff check --output-format=github --select E9,F63,F7,F82 custom_components tests
+      - name: Lint maintained regression code
+        run: >-
+          python -m ruff check --output-format=github
+          tests/test_translations.py
+          tests/test_translation_regressions.py
+          tests/test_active_alerts.py
+          tests/test_fan.py
+          tests/test_coordinator_lifecycle.py
+          tests/test_entry_lifecycle.py
+          tests/test_issue20_hardening.py
+          tests/ha_test_support.py
+          custom_components/brink_ventilation/fan.py
+          custom_components/brink_ventilation/core/option_mapping.py
+          custom_components/brink_ventilation/core/parameter_validation.py
+      - name: Check maintained regression formatting
+        run: >-
+          python -m ruff format --check
+          tests/test_translations.py
+          tests/test_translation_regressions.py
+          tests/test_active_alerts.py
+          tests/test_fan.py
+          tests/test_coordinator_lifecycle.py
+          tests/test_entry_lifecycle.py
+          tests/test_issue20_hardening.py
+          tests/ha_test_support.py
+          custom_components/brink_ventilation/core/option_mapping.py
+          custom_components/brink_ventilation/core/parameter_validation.py
+
+  tests:
+    name: Tests (HA ${{ matrix.home-assistant }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - home-assistant: "2026.7.0"
+            requirements: requirements_test_minimum.txt
+          - home-assistant: "2026.10.3"
+            requirements: requirements_test.txt
+          - home-assistant: "2026.11.0"
+            requirements: requirements_test_2026_11.txt
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: ${{ matrix.requirements }}
+      - name: Install test dependencies
+        env:
+          TEST_REQUIREMENTS: ${{ matrix.requirements }}
+        run: python -m pip install -r "$TEST_REQUIREMENTS"
+      - name: Check installed dependencies
+        run: python -m pip check
+      - name: Verify Home Assistant version
+        env:
+          EXPECTED_HOME_ASSISTANT: ${{ matrix.home-assistant }}
+        run: |
+          python - <<'PY'
+          """Verify CI tests the declared Home Assistant release."""
+
+          import os
+          from importlib.metadata import version
+
+          expected_version = os.environ["EXPECTED_HOME_ASSISTANT"]
+          installed_version = version("homeassistant")
+          if installed_version != expected_version:
+              raise SystemExit(
+                  f"Expected Home Assistant {expected_version}, installed {installed_version}"
+              )
+          print(f"Testing Home Assistant {installed_version}")
+          PY
+      - name: Run tests
+        env:
+          HA_TEST_VERSION: ${{ matrix.home-assistant }}
+        run: |
+          if [ "$HA_TEST_VERSION" = "2026.11.0" ]; then
+            # Home Assistant 2026.11 must initialize httpx2 before pytest plugins import httpx.
+            python -c 'import homeassistant; import pytest; raise SystemExit(pytest.main(["-q"]))'
+          else
+            python -m pytest -q
+          fi

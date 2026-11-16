@@ -1,0 +1,40 @@
+set_airflow:
+  name: Set airflow
+  description: Set the target airflow in cubic meters per hour.
+  target:
+    entity:
+      domain: fan
+      integration: brink_ventilation
+  fields:
+    airflow:
+      name: Airflow
+      description: Target airflow.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 5
+          mode: slider
+          unit_of_measurement: m³/h
+
+set_level:
+  name: Set ventilation level
+  description: Set the Brink ventilation level.
+  target:
+    entity:
+      domain: fan
+      integration: brink_ventilation
+  fields:
+    level:
+      name: Ventilation level
+      description: Select the ventilation level.
+      required: true
+      selector:
+        select:
+          options:
+            - "0"
+            - "1"
+            - "2"
+            - "3"
+          translation_key: brink_level

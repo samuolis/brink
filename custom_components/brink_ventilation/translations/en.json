@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Brink Home Ventilation",
-        "description": "Please login to your Brink Home portal services account.",
+        "description": "Please log in with your Brink Home portal account.",
         "data": {
           "username": "Email",
           "password": "Password"
@@ -15,7 +15,7 @@
       "reauth_successful": "Re-authentication was successful."
     },
     "error": {
-      "cannot_connect": "Can't connect. Try again later.",
+      "cannot_connect": "Cannot connect. Please try again later.",
       "invalid_auth": "Email or password is incorrect.",
       "unknown": "Unknown error."
     }
@@ -26,9 +26,872 @@
         "title": "Configure Brink Home integration",
         "description": "Update the scan interval to poll for data more often.",
         "data": {
-          "scan_interval": "Scan Interval (seconds)"
+          "scan_interval": "Scan interval (seconds)"
         }
       }
+    }
+  },
+  "services": {
+    "set_airflow": {
+      "name": "Set airflow",
+      "description": "Set the target airflow in cubic meters per hour.",
+      "fields": {
+        "airflow": {
+          "name": "Airflow",
+          "description": "Target airflow."
+        }
+      }
+    },
+    "set_level": {
+      "name": "Set ventilation level",
+      "description": "Set the Brink ventilation level.",
+      "fields": {
+        "level": {
+          "name": "Ventilation level",
+          "description": "Select the ventilation level."
+        }
+      }
+    }
+  },
+  "selector": {
+    "brink_level": {
+      "options": {
+        "0": "Off",
+        "1": "Low",
+        "2": "Medium",
+        "3": "High"
+      }
+    }
+  },
+  "entity": {
+    "fan": {
+      "ventilation_airflow": {
+        "name": "Ventilation airflow",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "automatic": "Automatic",
+              "manual": "Manual",
+              "holiday": "Holiday",
+              "party": "Party",
+              "night_ventilation": "Night ventilation"
+            }
+          }
+        }
+      },
+      "ventilation_level": {
+        "name": "Ventilation level",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "automatic": "Automatic",
+              "manual": "Manual",
+              "holiday": "Holiday",
+              "party": "Party",
+              "night_ventilation": "Night ventilation"
+            }
+          }
+        }
+      }
+    },
+    "select": {
+      "ventilation_level": {
+        "name": "Ventilation level",
+        "state": {
+          "level_0": "Off",
+          "level_1": "Level 1",
+          "level_2": "Level 2",
+          "level_3": "Level 3",
+          "cn1": "External input (CN1)"
+        }
+      },
+      "mode_input_1": {
+        "name": "Input 1 mode",
+        "state": {
+          "0": "Off",
+          "1": "On",
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "mode_input_2": {
+        "name": "Input 2 mode",
+        "state": {
+          "0": "Off",
+          "1": "On",
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "contact_1_supply_fan_action": {
+        "name": "Contact 1 supply fan action",
+        "state": {
+          "fan_off": "Fan off",
+          "fan_runs_at_absolute_minimum": "Fan runs at absolute minimum",
+          "fan_at_setting_0": "Fan at setting 0",
+          "fan_at_setting_1": "Fan at setting 1",
+          "fan_at_setting_2": "Fan at setting 2",
+          "fan_at_setting_3": "Fan at setting 3",
+          "fan_at_step_0": "Fan at setting 0",
+          "fan_according_to_multiple_switch": "Fan according to multiple switch",
+          "fan_runs_at_absolute_maximum": "Fan runs at absolute maximum",
+          "no_supply_fan_control": "No fan control",
+          "supply_fan_off": "Supply fan off",
+          "min_ventilation_50_m3_h": "Minimum ventilation 50 m³/h",
+          "air_flow_level_1": "Airflow level 1",
+          "air_flow_level_2": "Airflow level 2",
+          "air_flow_level_3": "Airflow level 3",
+          "max_air_flow": "Maximum airflow",
+          "no_control_supply_fan": "No supply fan control"
+        }
+      },
+      "contact_1_exhaust_fan_action": {
+        "name": "Contact 1 exhaust fan action",
+        "state": {
+          "fan_off": "Fan off",
+          "fan_absolute_minimum": "Fan runs at absolute minimum",
+          "fan_setting_1": "Fan at setting 1",
+          "fan_setting_2": "Fan at setting 2",
+          "fan_setting_3": "Fan at setting 3",
+          "fan_setting_0": "Fan at setting 0",
+          "fan_multiple_switch": "Fan according to multiple switch",
+          "fan_absolute_maximum": "Fan runs at absolute maximum",
+          "no_exhaust_fan_control": "No fan control",
+          "fan_runs_at_absolute_minimum": "Fan runs at absolute minimum",
+          "fan_at_setting_1": "Fan at setting 1",
+          "fan_at_setting_2": "Fan at setting 2",
+          "fan_at_setting_3": "Fan at setting 3",
+          "fan_at_setting_0": "Fan at setting 0",
+          "fan_at_step_0": "Fan at setting 0",
+          "fan_according_to_multiple_switch": "Fan according to multiple switch",
+          "fan_runs_at_absolute_maximum": "Fan runs at absolute maximum",
+          "extract_fan_off": "Extract fan off",
+          "min_ventilation_50_m3_h": "Minimum ventilation 50 m³/h",
+          "air_flow_level_1": "Airflow level 1",
+          "air_flow_level_2": "Airflow level 2",
+          "air_flow_level_3": "Airflow level 3",
+          "max_air_flow": "Maximum airflow",
+          "no_control_extract_fan": "No exhaust fan control"
+        }
+      },
+      "contact_1_type": {
+        "name": "Contact 1 type",
+        "state": {
+          "0": "Normally open contact",
+          "1": "Normally closed contact",
+          "make_contact": "Normally open (NO)",
+          "break_contact": "Normally closed (NC)",
+          "normaly_open_contact": "Normally open (NO)",
+          "nc_contact_normally_closed": "Normally closed (NC)",
+          "normally_open": "Normally open contact",
+          "normally_closed": "Normally closed contact"
+        }
+      },
+      "contact_2_supply_fan_action": {
+        "name": "Contact 2 supply fan action",
+        "state": {
+          "fan_off": "Fan off",
+          "fan_runs_at_absolute_minimum": "Fan runs at absolute minimum",
+          "fan_at_setting_0": "Fan at setting 0",
+          "fan_at_setting_1": "Fan at setting 1",
+          "fan_at_setting_2": "Fan at setting 2",
+          "fan_at_setting_3": "Fan at setting 3",
+          "fan_at_step_0": "Fan at setting 0",
+          "fan_according_to_multiple_switch": "Fan according to multiple switch",
+          "fan_runs_at_absolute_maximum": "Fan runs at absolute maximum",
+          "no_supply_fan_control": "No fan control",
+          "supply_fan_off": "Supply fan off",
+          "min_ventilation_50_m3_h": "Minimum ventilation 50 m³/h",
+          "air_flow_level_1": "Airflow level 1",
+          "air_flow_level_2": "Airflow level 2",
+          "air_flow_level_3": "Airflow level 3",
+          "max_air_flow": "Maximum airflow",
+          "no_control_supply_fan": "No supply fan control"
+        }
+      },
+      "contact_2_exhaust_fan_action": {
+        "name": "Contact 2 exhaust fan action",
+        "state": {
+          "fan_off": "Fan off",
+          "fan_absolute_minimum": "Fan runs at absolute minimum",
+          "fan_setting_1": "Fan at setting 1",
+          "fan_setting_2": "Fan at setting 2",
+          "fan_setting_3": "Fan at setting 3",
+          "fan_setting_0": "Fan at setting 0",
+          "fan_multiple_switch": "Fan according to multiple switch",
+          "fan_absolute_maximum": "Fan runs at absolute maximum",
+          "no_exhaust_fan_control": "No fan control",
+          "fan_runs_at_absolute_minimum": "Fan runs at absolute minimum",
+          "fan_at_setting_1": "Fan at setting 1",
+          "fan_at_setting_2": "Fan at setting 2",
+          "fan_at_setting_3": "Fan at setting 3",
+          "fan_at_setting_0": "Fan at setting 0",
+          "fan_at_step_0": "Fan at setting 0",
+          "fan_according_to_multiple_switch": "Fan according to multiple switch",
+          "fan_runs_at_absolute_maximum": "Fan runs at absolute maximum",
+          "extract_fan_off": "Extract fan off",
+          "min_ventilation_50_m3_h": "Minimum ventilation 50 m³/h",
+          "air_flow_level_1": "Airflow level 1",
+          "air_flow_level_2": "Airflow level 2",
+          "air_flow_level_3": "Airflow level 3",
+          "max_air_flow": "Maximum airflow",
+          "no_control_extract_fan": "No exhaust fan control"
+        }
+      },
+      "contact_2_type": {
+        "name": "Contact 2 type",
+        "state": {
+          "0": "Normally open contact",
+          "1": "Normally closed contact",
+          "make_contact": "Normally open (NO)",
+          "break_contact": "Normally closed (NC)",
+          "normaly_open_contact": "Normally open (NO)",
+          "nc_contact_normally_closed": "Normally closed (NC)",
+          "normally_open": "Normally open contact",
+          "normally_closed": "Normally closed contact"
+        }
+      },
+      "cn1_conditions": {
+        "name": "CN1 conditions",
+        "state": {
+          "0": "Filter warning only",
+          "1": "Fault condition only",
+          "2": "Filter and fault condition",
+          "only_filtercondition": "Filter warning only",
+          "only_faultcondition": "Fault condition only",
+          "filter_and_fault_condition": "Filter and fault condition"
+        }
+      },
+      "cn2_conditions": {
+        "name": "CN2 conditions",
+        "state": {
+          "0": "Filter warning only",
+          "1": "Fault condition only",
+          "2": "Filter and fault condition",
+          "only_filtercondition": "Filter warning only",
+          "only_faultcondition": "Fault condition only",
+          "filter_and_fault_condition": "Filter and fault condition"
+        }
+      },
+      "operating_mode": {
+        "name": "Operating mode",
+        "state": {
+          "automatic_mode": "Automatic",
+          "manual": "Manual",
+          "holiday_mode": "Holiday",
+          "party_mode": "Party",
+          "night_ventilation_mode": "Night ventilation"
+        }
+      },
+      "bypass_operation": {
+        "name": "Bypass operation",
+        "state": {
+          "0": "Automatic",
+          "1": "Bypass closed",
+          "2": "Bypass open",
+          "auto_mode": "Automatic",
+          "bypass_closed": "Bypass closed",
+          "bypass_open": "Bypass open"
+        }
+      },
+      "bypass_function": {
+        "name": "Bypass function",
+        "state": {
+          "auto_mode": "Automatic",
+          "automatic": "Automatic",
+          "bypass_closed": "Bypass closed",
+          "bypass_open": "Bypass open",
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "mode_valve_24v_control": {
+        "name": "24V valve mode",
+        "state": {
+          "open": "Open",
+          "closed": "Closed"
+        }
+      },
+      "valve_control": {
+        "name": "Valve control",
+        "state": {
+          "relay_output_1": "Relay output 1",
+          "relay_output_2": "Relay output 2",
+          "analog_output_1": "Analog output 1",
+          "analog_output_2": "Analog output 2",
+          "relais_output_1": "Relay output 1",
+          "relais_output_2": "Relay output 2"
+        }
+      },
+      "signal_output_mode": {
+        "name": "Signal output mode",
+        "state": {
+          "off": "Off",
+          "filter_condition_only": "Filter condition only",
+          "fault_condition_only": "Fault condition only",
+          "filter_and_fault_condition": "Filter and fault condition",
+          "only_filtercondition": "Filter condition only",
+          "only_faultcondition": "Fault condition only"
+        }
+      },
+      "cn1_switch_input_condition": {
+        "name": "CN1 switch input condition",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "on_if_bypass_conditions_met": "On if bypass conditions met",
+          "bypass_control": "Bypass control",
+          "bedroom_valve": "Bedroom valve"
+        }
+      },
+      "cn2_switch_input_condition": {
+        "name": "CN2 switch input condition",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "on_if_bypass_conditions_met": "On if bypass conditions met",
+          "bypass_control": "Bypass control",
+          "bedroom_valve": "Bedroom valve"
+        }
+      },
+      "supply_fan_control": {
+        "name": "Supply fan control",
+        "state": {
+          "constant_flow": "Constant flow",
+          "constant_rpm": "Constant speed",
+          "off": "Off"
+        }
+      },
+      "rh_sensor_sensitivity": {
+        "name": "Humidity sensor sensitivity",
+        "state": {
+          "0": "Normal",
+          "1": "High",
+          "2": "Very high",
+          "very_low": "Very low",
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High",
+          "very_high": "Very high"
+        }
+      }
+    },
+    "number": {
+      "imbalance_fireplace": {
+        "name": "Fireplace imbalance"
+      },
+      "ventilation_mode_0_airflow": {
+        "name": "Ventilation mode 0 airflow"
+      },
+      "ventilation_mode_1_airflow": {
+        "name": "Ventilation mode 1 airflow"
+      },
+      "ventilation_mode_2_airflow": {
+        "name": "Ventilation mode 2 airflow"
+      },
+      "ventilation_mode_3_airflow": {
+        "name": "Ventilation mode 3 airflow"
+      },
+      "bypass_hysteresis": {
+        "name": "Bypass hysteresis"
+      },
+      "minimum_intake_temperature": {
+        "name": "Minimum intake temperature"
+      },
+      "maximum_intake_temperature": {
+        "name": "Maximum intake temperature"
+      },
+      "days_until_filter_message": {
+        "name": "Days until filter message"
+      },
+      "bypass_temperature": {
+        "name": "Bypass temperature"
+      },
+      "switch_temp_1": {
+        "name": "Geothermal heat exchanger switch temperature 1"
+      },
+      "switch_temp_2": {
+        "name": "Geothermal heat exchanger switch temperature 2"
+      },
+      "v1_minimum_voltage": {
+        "name": "Input 1 minimum voltage"
+      },
+      "v2_minimum_voltage": {
+        "name": "Input 2 minimum voltage"
+      },
+      "v1_maximum_voltage": {
+        "name": "Input 1 maximum voltage"
+      },
+      "v2_maximum_voltage": {
+        "name": "Input 2 maximum voltage"
+      },
+      "rh_sensor_sensitivity": {
+        "name": "Humidity sensor sensitivity",
+        "state": {
+          "0": "Normal",
+          "1": "High",
+          "2": "Very high",
+          "very_low": "Very low",
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High",
+          "very_high": "Very high"
+        }
+      },
+      "co2_sensor_1_min_ppm": {
+        "name": "eBus CO₂ sensor 1 min PPM"
+      },
+      "co2_sensor_1_max_ppm": {
+        "name": "eBus CO₂ sensor 1 max PPM"
+      },
+      "co2_sensor_2_min_ppm": {
+        "name": "eBus CO₂ sensor 2 min PPM"
+      },
+      "co2_sensor_2_max_ppm": {
+        "name": "eBus CO₂ sensor 2 max PPM"
+      },
+      "co2_sensor_3_min_ppm": {
+        "name": "eBus CO₂ sensor 3 min PPM"
+      },
+      "co2_sensor_3_max_ppm": {
+        "name": "eBus CO₂ sensor 3 max PPM"
+      },
+      "co2_sensor_4_min_ppm": {
+        "name": "eBus CO₂ sensor 4 min PPM"
+      },
+      "co2_sensor_4_max_ppm": {
+        "name": "eBus CO₂ sensor 4 max PPM"
+      }
+    },
+    "sensor": {
+      "ip_address": {
+        "name": "IP address"
+      },
+      "dns_server": {
+        "name": "DNS server"
+      },
+      "owner_group_name": {
+        "name": "Owner group"
+      },
+      "iana_time_zone": {
+        "name": "Time zone"
+      },
+      "two_letter_country_code": {
+        "name": "Country"
+      },
+      "active_alert_count": {
+        "name": "Active alerts"
+      },
+      "access_level": {
+        "name": "Access level"
+      },
+      "additional_temperature_sensor": {
+        "name": "Additional temperature sensor"
+      },
+      "preheater_power": {
+        "name": "Preheater power"
+      },
+      "v1_analog_input": {
+        "name": "Analog input 1"
+      },
+      "v2_analog_input": {
+        "name": "Analog input 2"
+      },
+      "analog_input_1": {
+        "name": "Analog input 1"
+      },
+      "analog_input_2": {
+        "name": "Analog input 2"
+      },
+      "ventilation_level": {
+        "name": "Ventilation level",
+        "state": {
+          "off": "Off",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "cn1": "External input (CN1)"
+        }
+      },
+      "ventilation_mode_0_airflow": {
+        "name": "Ventilation mode 0 airflow"
+      },
+      "ventilation_mode_1_airflow": {
+        "name": "Ventilation mode 1 airflow"
+      },
+      "ventilation_mode_2_airflow": {
+        "name": "Ventilation mode 2 airflow"
+      },
+      "ventilation_mode_3_airflow": {
+        "name": "Ventilation mode 3 airflow"
+      },
+      "ventilation_percentage": {
+        "name": "Ventilation percentage"
+      },
+      "filter_message": {
+        "name": "Filter message",
+        "state": {
+          "0": "No active filter message",
+          "1": "Filter needs attention",
+          "no_active_filter_message": "No active filter message",
+          "filter_needs_attention": "Filter needs attention",
+          "not_dirty": "No active filter message",
+          "dirty": "Filter needs attention"
+        }
+      },
+      "days_until_filter_message": {
+        "name": "Days until filter message"
+      },
+      "bypass_temperature": {
+        "name": "Bypass temperature"
+      },
+      "supply_air_flow_setpoint": {
+        "name": "Supply airflow setpoint"
+      },
+      "actual_supply_air_flow": {
+        "name": "Supply airflow"
+      },
+      "supply_air_flow": {
+        "name": "Supply airflow"
+      },
+      "nominal_supply_air_flow": {
+        "name": "Nominal supply airflow"
+      },
+      "supply_air_pressure": {
+        "name": "Supply air pressure"
+      },
+      "supply_duct_pressure": {
+        "name": "Supply duct pressure"
+      },
+      "supply_fan_rpm": {
+        "name": "Supply fan speed"
+      },
+      "exhaust_air_flow_setpoint": {
+        "name": "Exhaust airflow setpoint"
+      },
+      "actual_exhaust_air_flow": {
+        "name": "Exhaust airflow"
+      },
+      "exhaust_air_flow": {
+        "name": "Exhaust airflow"
+      },
+      "nominal_exhaust_air_flow": {
+        "name": "Nominal exhaust airflow"
+      },
+      "exhaust_air_pressure": {
+        "name": "Exhaust air pressure"
+      },
+      "exhaust_duct_pressure": {
+        "name": "Exhaust duct pressure"
+      },
+      "exhaust_fan_rpm": {
+        "name": "Exhaust fan speed"
+      },
+      "fresh_air_temp": {
+        "name": "Outdoor air temperature"
+      },
+      "extract_air_temperature": {
+        "name": "Extract air temperature"
+      },
+      "exhaust_temp": {
+        "name": "Exhaust air temperature"
+      },
+      "supply_temp": {
+        "name": "Supply air temperature"
+      },
+      "extra_air_temp": {
+        "name": "Extra air temperature"
+      },
+      "humidity": {
+        "name": "Relative humidity"
+      },
+      "relative_humidity": {
+        "name": "Relative humidity"
+      },
+      "supply_air_humidity": {
+        "name": "Supply air humidity"
+      },
+      "extract_air_humidity": {
+        "name": "Extract air humidity"
+      },
+      "days_since_filter_reset": {
+        "name": "Days since filter reset"
+      },
+      "remaining_duration": {
+        "name": "Remaining mode duration"
+      },
+      "active_control_status": {
+        "name": "Active control status",
+        "state": {
+          "0": "Standby",
+          "1": "Bootloader",
+          "2": "Non-blocking fault",
+          "3": "Blocking fault",
+          "4": "Manual",
+          "5": "Holiday",
+          "6": "Night ventilation",
+          "7": "Party",
+          "8": "Bypass boost",
+          "9": "Normal boost",
+          "10": "Auto CO₂",
+          "11": "Auto eBus",
+          "12": "Auto Modbus",
+          "13": "Auto LAN/WLAN portal",
+          "14": "Auto LAN/WLAN local",
+          "standby": "Standby",
+          "bootloader": "Bootloader",
+          "non_locking_fault": "Non-blocking fault",
+          "blocking_fault": "Blocking fault",
+          "blocking_error": "Blocking fault",
+          "manual": "Manual",
+          "holiday": "Holiday",
+          "night_ventilation_mode": "Night ventilation",
+          "party": "Party",
+          "bypass_boost": "Bypass boost",
+          "normal_boost": "Normal boost",
+          "auto_co2": "Auto CO₂",
+          "auto_ebus": "Auto eBus",
+          "auto_modbus": "Auto Modbus",
+          "auto_lan_wlan_portal": "Auto LAN/WLAN portal",
+          "auto_lan_wlan_local": "Auto LAN/WLAN local"
+        }
+      },
+      "filter_status": {
+        "name": "Filter status",
+        "state": {
+          "0": "Clean",
+          "1": "Dirty",
+          "not_dirty": "Clean",
+          "dirty": "Dirty"
+        }
+      },
+      "preheater_status": {
+        "name": "Preheater status",
+        "state": {
+          "off": "Off",
+          "auto": "Automatic",
+          "lock_current": "Current state locked",
+          "lock_maximum": "Maximum locked"
+        }
+      },
+      "bypass_valve_status": {
+        "name": "Bypass valve status",
+        "state": {
+          "initialisation": "Initialization",
+          "opens": "Opening",
+          "open": "Open",
+          "closed": "Closed",
+          "initialization": "Initialization",
+          "opening": "Opening",
+          "closing": "Closing"
+        }
+      },
+      "co2_sensor_1": {
+        "name": "CO₂ sensor 1"
+      },
+      "co2_sensor_2": {
+        "name": "CO₂ sensor 2"
+      },
+      "co2_sensor_3": {
+        "name": "CO₂ sensor 3"
+      },
+      "co2_sensor_4": {
+        "name": "CO₂ sensor 4"
+      },
+      "status_geothermal_heat_exchanger": {
+        "name": "Geothermal heat exchanger status",
+        "state": {
+          "0": "Open low",
+          "1": "Closed",
+          "3": "Open high",
+          "open_low": "Open low",
+          "closed": "Closed",
+          "open_high": "Open high"
+        }
+      },
+      "frost_protection_status": {
+        "name": "Frost protection status",
+        "state": {
+          "0": "Not initialized",
+          "1": "Power-up delay",
+          "2": "No frost",
+          "3": "No frost delay",
+          "4": "Frost control start delay",
+          "5": "Waiting for icing",
+          "6": "Ice detected delay",
+          "7": "Heating active",
+          "8": "Waiting for free heater",
+          "9": "Fan control start delay",
+          "10": "Waiting for fan control",
+          "11": "Fan control active",
+          "12": "Fan off delay",
+          "13": "Fan off",
+          "14": "Fan restarting",
+          "15": "Error",
+          "16": "Periodic coil test",
+          "unknown": "Unknown",
+          "not_initialized": "Not initialized",
+          "power_up_delay": "Power-up delay",
+          "no_frost": "No frost",
+          "no_frost_delay": "No frost delay",
+          "frost_control_start_delay": "Frost control start delay",
+          "wait_for_icing": "Waiting for icing",
+          "ice_detected_delay": "Ice detected delay",
+          "heating": "Heating active",
+          "wait_for_free_heater": "Waiting for free heater",
+          "fan_control_start_delay": "Fan control start delay",
+          "fan_control_wait": "Waiting for fan control",
+          "fan_control": "Fan control active",
+          "fan_off_delay": "Fan off delay",
+          "fan_off": "Fan off",
+          "fan_restarting": "Fan restarting",
+          "error": "Error",
+          "periodic_coil_test": "Periodic coil test",
+          "start_delay": "Power-up delay",
+          "wait_for_ice": "Waiting for icing",
+          "wait_for_fan_control": "Waiting for fan control",
+          "fan_restart": "Fan restarting",
+          "water_block_test": "Water block test"
+        }
+      },
+      "gateway_state": {
+        "name": "Gateway state",
+        "state": {
+          "locked": "Locked",
+          "offline": "Offline",
+          "online": "Online"
+        }
+      },
+      "cabinet_sound_power": {
+        "name": "Cabinet sound power"
+      },
+      "supply_sound_power": {
+        "name": "Supply duct sound power"
+      },
+      "exhaust_sound_power": {
+        "name": "Exhaust duct sound power"
+      }
+    },
+    "binary_sensor": {
+      "api_online": {
+        "name": "API status",
+        "state": {
+          "off": "Offline",
+          "on": "Online"
+        }
+      },
+      "blocking_error": {
+        "name": "Blocking error",
+        "state": {
+          "off": "No blocking error",
+          "on": "Blocking error"
+        }
+      },
+      "gateway_status": {
+        "name": "Gateway status",
+        "state": {
+          "off": "Offline",
+          "on": "Online"
+        }
+      },
+      "device_online": {
+        "name": "Device status",
+        "state": {
+          "off": "Offline",
+          "on": "Online"
+        }
+      },
+      "ebus_co2_sensor_status": {
+        "name": "eBus CO₂ sensor",
+        "state": {
+          "off": "Inactive",
+          "on": "Active"
+        }
+      },
+      "status_filter_message": {
+        "name": "Filter message status",
+        "state": {
+          "off": "No active filter message",
+          "on": "Filter needs attention"
+        }
+      },
+      "rh_sensor_status": {
+        "name": "Humidity sensor",
+        "state": {
+          "off": "Inactive",
+          "on": "Active"
+        }
+      },
+      "co2_sensor_status": {
+        "name": "CO₂ sensor",
+        "state": {
+          "off": "Inactive",
+          "on": "Active"
+        }
+      },
+      "cn1_position": {
+        "name": "CN1 input",
+        "state": {
+          "off": "Closed",
+          "on": "Open"
+        }
+      },
+      "cn2_position": {
+        "name": "CN2 input",
+        "state": {
+          "off": "Closed",
+          "on": "Open"
+        }
+      },
+      "cn1_switch_input": {
+        "name": "CN1 switch input",
+        "state": {
+          "off": "Closed",
+          "on": "Open"
+        }
+      },
+      "cn2_switch_input": {
+        "name": "CN2 switch input",
+        "state": {
+          "off": "Closed",
+          "on": "Open"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_ventilation_level": {
+      "message": "Ventilation level {level} is invalid. Select a level from 0 to 3."
+    },
+    "device_unavailable": {
+      "message": "The Brink device is unavailable."
+    },
+    "airflow_parameter_unavailable": {
+      "message": "The airflow parameter for level {level} is unavailable."
+    },
+    "ventilation_parameter_unavailable": {
+      "message": "The ventilation level parameter is unavailable."
+    },
+    "operating_mode_unavailable": {
+      "message": "The operating mode parameter is unavailable."
+    },
+    "unknown_preset_mode": {
+      "message": "Preset mode {preset_mode} is not supported."
+    },
+    "parameter_unavailable": {
+      "message": "Parameter {parameter} is unavailable."
+    },
+    "external_control": {
+      "message": "CN1 is controlled by an external input."
+    },
+    "unknown_option": {
+      "message": "Option {option} is not supported for {parameter}."
+    },
+    "value_out_of_range": {
+      "message": "Value {value} is outside the allowed range of {minimum} to {maximum}."
+    },
+    "ambiguous_option": {
+      "message": "Option {option} matches multiple device values for {parameter} and cannot be selected safely."
     }
   }
 }
